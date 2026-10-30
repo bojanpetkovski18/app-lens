@@ -16,9 +16,16 @@ const entityName = z.string().max(60).regex(NAME, NAME_MESSAGE);
 const fieldName = z.string().max(60).regex(NAME, NAME_MESSAGE);
 
 const text = (max: number) => z.string().trim().min(1).max(max);
-const httpUrl = z.url().refine((value) => /^https?:\/\//.test(value), 'Only http(s) URLs are allowed.');
+const httpUrl = z.url().refine((value) => /^https?:\/\//i.test(value), 'Only http(s) URLs are allowed.');
 const hexColor = z.string().regex(HEX_COLOR, 'Use a hex color such as "#4f46e5".');
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.');
+function isCalendarDate(value: string): boolean {
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.')
+  .refine(isCalendarDate, 'This date does not exist.');
 const scalar = z.union([z.string().max(500), z.number(), z.boolean(), z.null()]);
 const valueMap = z.record(fieldName, scalar);
 

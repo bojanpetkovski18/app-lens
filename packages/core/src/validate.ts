@@ -1,5 +1,5 @@
-import { parseFieldSpec } from './fields';
-import { entityOrder, ReferenceCycleError } from './generator';
+import { parseFieldSpec, type FieldSpec } from './fields';
+import { entityOrder, ownValue, ReferenceCycleError } from './generator';
 import { manifestSchema, type Manifest, type Scenario } from './schema';
 
 export interface ManifestIssue {
@@ -37,15 +37,38 @@ function checkEntities(manifest: Manifest, issues: ManifestIssue[]): boolean {
       if (!parsed.ok) {
         specsValid = false;
         issues.push({ path, message: parsed.error });
-      } else if (parsed.spec.kind === 'ref' && parsed.spec.target && !manifest.entities[parsed.spec.target]) {
+      } else if (parsed.spec.kind === 'ref' && parsed.spec.target && !ownValue(manifest.entities, parsed.spec.target)) {
         issues.push({ path, message: `References unknown entity "${parsed.spec.target}".` });
       }
     }
-    if (entity.display && !(entity.display in entity.fields)) {
+    if (entity.display && !Object.hasOwn(entity.fields, entity.display)) {
       issues.push({ path: `entities.${name}.display`, message: `Unknown field "${entity.display}".` });
     }
   }
   return specsValid;
+}
+
+/** Null clears a field, so it always passes. Returns a problem or null. */
+function valueProblem(spec: FieldSpec, value: unknown): string | null {
+  if (value === null) return null;
+  switch (spec.kind) {
+    case 'enum':
+      return spec.options?.includes(String(value)) ? null : `"${String(value)}" is not one of: ${spec.options?.join(', ')}.`;
+    case 'int':
+    case 'float':
+    case 'money':
+    case 'percent':
+      return typeof value === 'number' ? null : `"${String(value)}" is not a number.`;
+    case 'bool':
+      return typeof value === 'boolean' ? null : `"${String(value)}" is not true or false.`;
+    case 'date':
+    case 'datetime':
+      return value === '$today' || value === '$now' || !Number.isNaN(new Date(String(value)).getTime())
+        ? null
+        : `"${String(value)}" is not a date.`;
+    default:
+      return null;
+  }
 }
 
 function checkValues(
@@ -56,19 +79,18 @@ function checkValues(
   allowId: boolean,
   issues: ManifestIssue[],
 ): void {
-  const entity = manifest.entities[scenario.entity];
+  const entity = ownValue(manifest.entities, scenario.entity);
   if (!entity || !values) return;
   for (const [field, value] of Object.entries(values)) {
     if (allowId && field === 'id') continue;
-    const raw = entity.fields[field];
+    const raw = ownValue(entity.fields, field);
     if (raw === undefined) {
       issues.push({ path: `${path}.${field}`, message: `Unknown field "${field}" on ${scenario.entity}.` });
       continue;
     }
     const parsed = parseFieldSpec(raw);
-    if (parsed.ok && parsed.spec.kind === 'enum' && !parsed.spec.options?.includes(String(value))) {
-      issues.push({ path: `${path}.${field}`, message: `"${String(value)}" is not one of: ${parsed.spec.options?.join(', ')}.` });
-    }
+    const problem = parsed.ok ? valueProblem(parsed.spec, value) : null;
+    if (problem) issues.push({ path: `${path}.${field}`, message: problem });
   }
 }
 
@@ -93,7 +115,7 @@ function checkReferences(manifest: Manifest): ManifestIssue[] {
       if (!personas.has(persona)) issues.push({ path: `features[${index}].personas[${i}]`, message: `Unknown persona "${persona}".` });
     });
     feature.entities.forEach((entity, i) => {
-      if (!manifest.entities[entity]) issues.push({ path: `features[${index}].entities[${i}]`, message: `Unknown entity "${entity}".` });
+      if (!ownValue(manifest.entities, entity)) issues.push({ path: `features[${index}].entities[${i}]`, message: `Unknown entity "${entity}".` });
     });
   });
 
@@ -102,7 +124,7 @@ function checkReferences(manifest: Manifest): ManifestIssue[] {
     if (scenario.persona && !personas.has(scenario.persona)) {
       issues.push({ path: `${path}.persona`, message: `Unknown persona "${scenario.persona}".` });
     }
-    if (!manifest.entities[scenario.entity]) {
+    if (!ownValue(manifest.entities, scenario.entity)) {
       issues.push({ path: `${path}.entity`, message: `Unknown entity "${scenario.entity}".` });
       return;
     }

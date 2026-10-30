@@ -1,5 +1,5 @@
 import { isoDate, type Scalar } from './fields';
-import { createRecord, resolveBaseDate, type Dataset, type MockRecord } from './generator';
+import { createRecord, ownValue, resolveBaseDate, type Dataset, type MockRecord } from './generator';
 import { createRng } from './rng';
 import type { Manifest, Scenario, ScenarioStep } from './schema';
 
@@ -33,13 +33,13 @@ export function runScenario(
   scenario: Scenario,
   options: RunScenarioOptions = {},
 ): ScenarioFrame[] {
-  if (!manifest.entities[scenario.entity]) {
+  if (!ownValue(manifest.entities, scenario.entity)) {
     throw new Error(`Scenario "${scenario.id}" uses unknown entity "${scenario.entity}".`);
   }
   const rng = createRng(options.seed ?? manifest.mock.seed).fork(`scenario:${scenario.id}`);
   const baseDate = resolveBaseDate(manifest, options.baseDate);
 
-  let records = [...(dataset[scenario.entity] ?? [])];
+  let records = [...(ownValue(dataset, scenario.entity) ?? [])];
   const working: Dataset = { ...dataset, [scenario.entity]: records };
   let nextSequence = records.length + 1;
   let subject: MockRecord | null = null;

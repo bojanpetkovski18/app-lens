@@ -6,6 +6,7 @@ export * from './generator';
 export * from './importers';
 export * from './intake';
 export * from './lint';
+export * from './projectfiles';
 export * from './rng';
 export * from './scenario';
 export * from './schema';

@@ -35,6 +35,14 @@ export function Showcase({ manifest, theme, embedded, toolbar, initialTab, initi
     setPersona(knownPersona);
   }, [knownPersona]);
 
+  // Reached only by live previews: other hosts get a new instance per manifest.
+  useEffect(() => {
+    setSeed(manifest.mock.seed);
+  }, [manifest.mock.seed]);
+  useEffect(() => {
+    setPersona((current) => (current && manifest.personas.some((p) => p.id === current) ? current : null));
+  }, [manifest]);
+
   const track = useTrack();
   const firstRender = useRef(true);
   useEffect(() => {

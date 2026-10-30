@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@app-lens/core": "*",
     "htmlparser2": "^10.0.0",
     "yaml": "^2.6.0"

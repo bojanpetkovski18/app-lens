@@ -29,7 +29,7 @@ function forwardEvent(event: AppLensEvent): void {
 }
 
 // Loaded on demand because it pulls in a YAML parser.
-const AttachDialog = lazy(() => import('./components/AttachDialog'));
+const AttachDialog = lazy(() => import('@app-lens/ui/attach'));
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; manifest: unknown };
 

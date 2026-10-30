@@ -7,14 +7,16 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./attach": "./src/AttachDialog.tsx"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
-    "@app-lens/core": "*"
+    "@app-lens/core": "*",
+    "yaml": "^2.6.0"
   },
   "peerDependencies": {
     "react": "^18.3.1",

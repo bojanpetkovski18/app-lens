@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { isTrustedRequest } from '../attach-endpoint';
-import { readSelectedFiles } from '../src/components/AttachDialog';
+import { readSelectedFiles } from '@app-lens/ui/attach';
 
 const request = (headers: Record<string, string>, method = 'POST') => ({ method, headers: { 'content-type': 'application/json', ...headers } });
 

@@ -3,12 +3,19 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "bin": { "app-lens": "./dist/cli.js" },
+  "bin": {
+    "app-lens": "./dist/cli.js"
+  },
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "@app-lens/core": "*" },
-  "devDependencies": { "esbuild": "^0.25.0", "vitest": "^3.2.7" }
+  "dependencies": {
+    "@app-lens/core": "*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "vitest": "^4.1.12"
+  }
 }

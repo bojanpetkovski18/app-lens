@@ -83,3 +83,13 @@ export function mediaMatches(query: string): boolean {
 export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
+
+export function downloadBlob(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  // Some browsers start the download asynchronously.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

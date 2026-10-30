@@ -1,5 +1,5 @@
-import type { Dataset, Manifest } from '@app-lens/core';
-import { initials, isForPersona, isScenarioForPersona } from '../util';
+import { renderMarkdown, renderPdf, type Dataset, type Manifest } from '@app-lens/core';
+import { downloadBlob, initials, isForPersona, isScenarioForPersona, slug } from '../util';
 import type { DataFocus } from './DataExplorer';
 import type { Tab } from './Showcase';
 
@@ -24,6 +24,8 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
     { label: 'Walkthroughs', value: manifest.scenarios.filter((s) => isScenarioForPersona(s, persona)).length, tab: 'scenarios' },
   ];
 
+  const fileName = slug(app.name) || 'app';
+
   return (
     <div className="al-stack">
       {app.description || app.website ? (
@@ -34,6 +36,11 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
               Visit website
             </a>
           ) : null}
+          <div className="al-row">
+            <span className="al-muted">One-pager:</span>
+            <button type="button" className="al-link" onClick={() => downloadBlob(new Blob([renderPdf(manifest).slice()], { type: 'application/pdf' }), `${fileName}.pdf`)}>PDF</button>
+            <button type="button" className="al-link" onClick={() => downloadBlob(new Blob([renderMarkdown(manifest)], { type: 'text/markdown' }), `${fileName}.md`)}>Markdown</button>
+          </div>
         </section>
       ) : null}
 

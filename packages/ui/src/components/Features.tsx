@@ -1,5 +1,6 @@
 import type { Manifest } from '@app-lens/core';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTrack } from '../analytics';
 import { isForPersona } from '../util';
 import type { DataFocus } from './DataExplorer';
 
@@ -19,7 +20,19 @@ export function Features({ manifest, persona, onOpenData }: FeaturesProps) {
     [forPersona],
   );
   const activeCategory = category && categories.includes(category) ? category : null;
-  const visible = forPersona.filter((feature) => !activeCategory || feature.category === activeCategory);
+  const visible = useMemo(
+    () => forPersona.filter((feature) => !activeCategory || feature.category === activeCategory),
+    [forPersona, activeCategory],
+  );
+  const track = useTrack();
+  const seen = useRef(new Set<string>());
+  useEffect(() => {
+    for (const feature of visible) {
+      if (seen.current.has(feature.id)) continue;
+      seen.current.add(feature.id);
+      track({ type: 'feature_viewed', feature: feature.id });
+    }
+  }, [visible, track]);
   const personaLabel = (id: string) => manifest.personas.find((p) => p.id === id)?.label ?? id;
 
   return (

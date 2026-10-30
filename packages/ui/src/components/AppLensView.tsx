@@ -1,8 +1,18 @@
-import { parseManifest } from '@app-lens/core';
+import { parseManifest, type Manifest } from '@app-lens/core';
 import { useMemo, type ReactNode } from 'react';
 import { Frame, type ThemeOverrides } from '../theme';
 import { IssuesView } from './IssuesView';
 import { Showcase, type Tab } from './Showcase';
+
+// Each manifest gets its own Showcase instance, so persona, seed and focus never carry over.
+const manifestKeys = new WeakMap<Manifest, number>();
+let nextManifestKey = 0;
+
+function keyOf(manifest: Manifest): number {
+  const key = manifestKeys.get(manifest) ?? ++nextManifestKey;
+  manifestKeys.set(manifest, key);
+  return key;
+}
 
 export interface AppLensViewProps {
   manifest: unknown;
@@ -24,6 +34,7 @@ export function AppLensView({ manifest, theme, embedded, toolbar, initialTab, in
   }
   return (
     <Showcase
+      key={keyOf(result.manifest)}
       manifest={result.manifest}
       theme={theme}
       embedded={embedded}

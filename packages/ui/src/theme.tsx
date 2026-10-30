@@ -1,6 +1,7 @@
 import { FONT_STACK, HEX_COLOR, THEME_MODES, type ThemeMode, type ThemeSettings } from '@app-lens/core';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Brand } from './components/Brand';
+import { mediaMatches } from './util';
 
 export type ThemeOverrides = Partial<ThemeSettings>;
 
@@ -26,8 +27,9 @@ export function sanitizeTheme(raw: RawTheme): ThemeOverrides {
 }
 
 function usePrefersDark(): boolean {
-  const [dark, setDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
+  const [dark, setDark] = useState(() => mediaMatches('(prefers-color-scheme: dark)'));
   useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
     const query = matchMedia('(prefers-color-scheme: dark)');
     const onChange = (event: MediaQueryListEvent) => setDark(event.matches);
     query.addEventListener('change', onChange);

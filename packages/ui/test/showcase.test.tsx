@@ -143,7 +143,7 @@ describe('demo player', () => {
     vi.useFakeTimers();
     render(<AppLensView manifest={manifest()} initialTab="scenarios" />);
     fireEvent.click(screen.getByRole('button', { name: 'Generate demo' }));
-    act(() => { vi.advanceTimersByTime(7000); });
+    for (let stage = 0; stage < 8; stage++) act(() => { vi.advanceTimersByTime(1000); });
     return screen.getByRole('region', { name: 'Product demo video' });
   };
 
@@ -215,11 +215,16 @@ describe('util', () => {
   });
 
   it('reuses number formatters', () => {
-    const format = vi.spyOn(Intl, 'NumberFormat');
+    const Real = Intl.NumberFormat;
+    let created = 0;
+    Intl.NumberFormat = function (...args: ConstructorParameters<typeof Real>) {
+      created++;
+      return new Real(...args);
+    } as unknown as typeof Intl.NumberFormat;
     formatMoney(1, 'CHF');
     formatMoney(2, 'CHF');
-    expect(format.mock.calls.length).toBeLessThanOrEqual(1);
-    format.mockRestore();
+    Intl.NumberFormat = Real;
+    expect(created).toBe(1);
   });
 
   it('indexes records by id once per list', () => {

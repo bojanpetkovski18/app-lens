@@ -150,6 +150,8 @@
 .al-root .al-matrix td { text-align: center; }
 .al-root .al-matrix tbody th { font-weight: 500; }
 .al-root .al-empty { padding: 18px; }
+.al-root .al-pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.al-root .al-table-hover tbody tr:focus-visible { outline-offset: -2px; }
 .al-root .al-percent { display: inline-flex; align-items: center; gap: 8px; }
 .al-root .al-percent-bar { display: inline-block; width: 60px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--al-border); }
 .al-root .al-percent-bar span { display: block; height: 100%; background: var(--al-primary); }
@@ -170,9 +172,9 @@
 
 /* Player and steps */
 .al-root .al-steps { display: flex; flex-direction: column; gap: 6px; list-style: none; }
-.al-root .al-steps li { display: flex; align-items: baseline; gap: 10px; padding: 7px 11px; border: 1px solid var(--al-border); border-radius: calc(var(--al-radius) - 3px); background: var(--al-surface); opacity: 0.72; }
-.al-root .al-steps li.is-done { opacity: 1; }
-.al-root .al-steps li.is-current { border-color: var(--al-primary); background: var(--al-primary-soft); opacity: 1; }
+.al-root .al-steps li { display: flex; align-items: baseline; gap: 10px; padding: 7px 11px; border: 1px solid var(--al-border); border-radius: calc(var(--al-radius) - 3px); background: var(--al-surface); color: var(--al-muted); }
+.al-root .al-steps li.is-done { color: var(--al-text); }
+.al-root .al-steps li.is-current { border-color: var(--al-primary); background: var(--al-primary-soft); color: var(--al-text); }
 .al-root .al-step-label { flex: none; width: 54px; color: var(--al-primary-strong); font-size: 12px; font-weight: 650; }
 .al-root .al-steps-compact li { padding: 4px 9px; font-size: 13.5px; }
 .al-root .al-narration { min-height: 24px; font-weight: 550; animation: al-fade-in 0.3s ease-out; }
@@ -183,8 +185,8 @@
 .al-root .al-progress { height: 8px; overflow: hidden; border-radius: 4px; background: var(--al-border); }
 .al-root .al-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--al-primary), var(--al-accent)); transition: width 0.4s ease; }
 .al-root .al-stages { display: flex; flex-direction: column; gap: 6px; list-style: none; }
-.al-root .al-stages li { display: flex; align-items: center; gap: 10px; opacity: 0.55; }
-.al-root .al-stages li.is-done, .al-root .al-stages li.is-current { opacity: 1; animation: al-fade-in 0.3s ease-out; }
+.al-root .al-stages li { display: flex; align-items: center; gap: 10px; color: var(--al-muted); }
+.al-root .al-stages li.is-done, .al-root .al-stages li.is-current { color: var(--al-text); animation: al-fade-in 0.3s ease-out; }
 .al-root .al-stage-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; border: 2px solid var(--al-border); border-radius: 50%; color: var(--al-primary-strong); font-size: 12px; }
 .al-root .al-stages li.is-current .al-stage-mark { border-color: var(--al-primary) transparent var(--al-primary) var(--al-primary); animation: al-spin 0.8s linear infinite; }
 
@@ -268,6 +270,7 @@
   .al-root .al-stages li,
   .al-root .al-video-stage,
   .al-root .al-video-caption,
+  .al-root .al-stages li.is-current .al-stage-mark,
   .al-root .al-cursor { animation: none; }
   .al-root .al-reveal, .al-root .al-progress span { transition: none; }
 }

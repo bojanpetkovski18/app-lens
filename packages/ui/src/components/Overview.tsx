@@ -59,7 +59,7 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
                 {p.description ? <p className="al-muted">{p.description}</p> : null}
                 {p.goals.length > 0 ? (
                   <ul className="al-list">
-                    {p.goals.map((goal) => <li key={goal}>{goal}</li>)}
+                    {p.goals.map((goal, index) => <li key={index}>{goal}</li>)}
                   </ul>
                 ) : null}
                 <button type="button" className="al-btn al-btn-ghost" aria-pressed={persona === p.id} onClick={() => onPersona(persona === p.id ? null : p.id)}>
@@ -109,8 +109,8 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
         <section className="al-stack">
           <h2>Works with</h2>
           <div className="al-grid al-grid-compact">
-            {manifest.integrations.map((integration) => (
-              <article key={integration.name} className="al-card">
+            {manifest.integrations.map((integration, index) => (
+              <article key={index} className="al-card">
                 <h3>{integration.name}</h3>
                 {integration.category ? <span className="al-tag">{integration.category}</span> : null}
                 {integration.description ? <p className="al-muted">{integration.description}</p> : null}

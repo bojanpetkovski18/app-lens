@@ -1,4 +1,4 @@
-import type { Feature, Scenario } from '@app-lens/core';
+import type { Feature, MockRecord, Scenario } from '@app-lens/core';
 
 export function isForPersona(feature: Feature, persona: string | null): boolean {
   return !persona || feature.personas.length === 0 || feature.personas.includes(persona);
@@ -13,7 +13,7 @@ export function initials(name: string): string {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((word) => word.charAt(0).toUpperCase())
+    .map((word) => (Array.from(word)[0] ?? '').toUpperCase())
     .join('');
 }
 
@@ -33,21 +33,51 @@ export function hue(value: string): number {
   return Math.abs(hash) % 360;
 }
 
+// Creating an Intl formatter is slow, and a table can need thousands of them.
+const moneyFormats = new Map<string, Intl.NumberFormat | null>();
+
 export function formatMoney(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(value);
-  } catch {
-    return value.toFixed(2);
+  let format = moneyFormats.get(currency);
+  if (format === undefined) {
+    try {
+      format = new Intl.NumberFormat(undefined, { style: 'currency', currency });
+    } catch {
+      format = null;
+    }
+    moneyFormats.set(currency, format);
   }
+  return format ? format.format(value) : value.toFixed(2);
 }
+
+let dateFormat: Intl.DateTimeFormat | undefined;
+let dateTimeFormat: Intl.DateTimeFormat | undefined;
 
 export function formatDate(value: string, withTime = false): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    ...(withTime ? { timeStyle: 'short' } : { timeZone: 'UTC' }),
-  }).format(date);
+  if (withTime) {
+    dateTimeFormat ??= new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    return dateTimeFormat.format(date);
+  }
+  dateFormat ??= new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' });
+  return dateFormat.format(date);
+}
+
+const recordIndexes = new WeakMap<readonly MockRecord[], Map<string, MockRecord>>();
+
+/** Id lookup for a record list, built once per list. */
+export function recordIndex(records: readonly MockRecord[]): Map<string, MockRecord> {
+  let index = recordIndexes.get(records);
+  if (!index) {
+    index = new Map(records.map((record) => [record.id, record]));
+    recordIndexes.set(records, index);
+  }
+  return index;
+}
+
+/** matchMedia is missing in some embedding environments and in tests. */
+export function mediaMatches(query: string): boolean {
+  return typeof matchMedia === 'function' && matchMedia(query).matches;
 }
 
 export function messageOf(error: unknown): string {

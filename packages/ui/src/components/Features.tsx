@@ -62,7 +62,7 @@ export function Features({ manifest, persona, onOpenData }: FeaturesProps) {
               {feature.description ? <p className="al-muted">{feature.description}</p> : null}
               {feature.highlights.length > 0 ? (
                 <ul className="al-list">
-                  {feature.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}
+                  {feature.highlights.map((highlight, index) => <li key={index}>{highlight}</li>)}
                 </ul>
               ) : null}
               <div className="al-tags">

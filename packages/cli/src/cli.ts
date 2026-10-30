@@ -1,6 +1,7 @@
 import { build, CliError, init, parseCliArgs, preview, schema, validate } from './commands';
 import { attach } from './intake/attach';
 import { diff, exportManifest, ingest, lint } from './smarts';
+import { studio } from './studio';
 
 const VERSION = '0.2.0';
 
@@ -15,8 +16,9 @@ Usage
   app-lens lint <file> [--min-score 80]              Score the manifest and suggest improvements
   app-lens diff <before> <after>                     List what changed between two manifests
   app-lens ingest openapi|prisma|readme <file>       Draft a manifest from an existing spec
-                   [--out file] [--report file] [--force]
+                   [--out file] [--report file] [--force] [--ai]
   app-lens export md|pdf <file> [--out file]         Write a one-pager
+  app-lens studio [file] [--port 4318]               Edit a manifest with a live preview
   app-lens attach <folder|github-url|website>        Draft a manifest from an existing project
                    [--out file] [--report file] [--max-files N] [--max-pages N]
                    [--dry-run] [--own] [--third-party] [--json]
@@ -68,7 +70,7 @@ async function main(): Promise<void> {
       diff(required(), third);
       break;
     case 'ingest':
-      ingest(required(), third, values);
+      await ingest(required(), third, values);
       break;
     case 'attach': {
       const limit = (value: string | undefined, name: string) => {
@@ -96,6 +98,9 @@ async function main(): Promise<void> {
       }
       break;
     }
+    case 'studio':
+      await studio(target, values);
+      break;
     case 'export':
       exportManifest(required(), third, values);
       break;

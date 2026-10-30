@@ -8,12 +8,14 @@
     "packages/ui",
     "packages/embed",
     "apps/viewer",
+    "apps/studio",
     "packages/cli"
   ],
   "scripts": {
     "dev": "npm run dev -w @app-lens/viewer",
     "dev:embed": "npm run dev -w @app-lens/embed",
-    "build": "npm run build -w @app-lens/viewer && npm run build -w @app-lens/embed && npm run build -w @app-lens/cli",
+    "dev:studio": "npm run dev -w @app-lens/studio",
+    "build": "npm run build -w @app-lens/viewer && npm run build -w @app-lens/studio && npm run build -w @app-lens/embed && npm run build -w @app-lens/cli",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "app-lens": "node packages/cli/dist/cli.js",

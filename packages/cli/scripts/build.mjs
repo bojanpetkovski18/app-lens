@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url';
 const cliRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = join(cliRoot, '../..');
 const viewerDist = join(repoRoot, 'apps/viewer/dist');
+const studioDist = join(repoRoot, 'apps/studio/dist');
 const embedBundle = join(repoRoot, 'packages/embed/dist/app-lens.js');
 const dist = join(cliRoot, 'dist');
 
-for (const required of [viewerDist, embedBundle]) {
+for (const required of [viewerDist, studioDist, embedBundle]) {
   if (!existsSync(required)) {
     console.error(`Missing ${required}. Run "npm run build" from the repo root.`);
     process.exit(1);
@@ -34,5 +35,6 @@ await build({
 });
 
 cpSync(viewerDist, join(dist, 'viewer'), { recursive: true });
+cpSync(studioDist, join(dist, 'studio'), { recursive: true });
 cpSync(embedBundle, join(dist, 'embed/app-lens.js'));
-console.log('Built packages/cli/dist (cli.js, viewer/, embed/app-lens.js)');
+console.log('Built packages/cli/dist (cli.js, viewer/, studio/, embed/app-lens.js)');

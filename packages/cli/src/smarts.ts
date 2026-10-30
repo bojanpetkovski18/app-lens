@@ -14,6 +14,7 @@ import {
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
+import { aiDraft, type DraftClient } from './ai';
 import { CliError, readManifestFile, writeJson } from './commands';
 
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
@@ -23,6 +24,7 @@ interface Options {
   force?: boolean;
   report?: string;
   'min-score'?: string;
+  ai?: boolean;
 }
 
 function readText(file: string): string {
@@ -67,10 +69,18 @@ export function signalsFromFile(type: string, file: string): ProjectSignals {
   }
 }
 
-export function ingest(type: string, file: string | undefined, options: Options = {}): void {
+export async function ingest(type: string, file: string | undefined, options: Options = {}, client?: DraftClient): Promise<void> {
   if (!file) throw new CliError('"ingest" needs a type and a file, e.g. "app-lens ingest openapi spec.yaml".');
   const out = options.out ?? 'app-lens.json';
   if (existsSync(out) && !options.force) throw new CliError(`${out} already exists. Use --force to overwrite it.`);
+  if (options.ai) {
+    // Parsing first means an unknown type or a broken spec fails before anything is sent.
+    signalsFromFile(type, file);
+    const result = await aiDraft(readText(file), type === 'openapi' ? 'OpenAPI spec' : type === 'prisma' ? 'Prisma schema' : 'README', client, (message) => console.log(message));
+    writeJson(out, result.manifest);
+    console.log(`Drafted ${out} with Claude. Review it before you publish it, for example in "app-lens studio ${out}".`);
+    return;
+  }
   const { manifest, report } = draftManifest(signalsFromFile(type, file), { fallbackName: basename(file, extname(file)) });
   writeJson(out, manifest);
   if (options.report) writeJson(options.report, report);

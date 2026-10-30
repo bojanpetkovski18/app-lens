@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-30, after **Phase 5**.
+Last updated: 2026-10-30, after **Phase 6**.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -112,9 +112,9 @@ It is a personal project. It must stay **independent of any employer or third-pa
 | 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Done |
 | 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export; plus `lint`, `diff`, CSV/JSON record export and `preview --watch` | #3 | Done |
 | 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Done |
-| 6. Studio | Visual manifest editor with live preview, optional AI drafting | #5 | Later |
+| 6. Studio | Visual manifest editor with live preview, optional AI drafting, `app-lens studio`, and a GitHub Pages workflow | #5 | Done |
 
-Verified at the end of Phase 5: 279 unit tests pass (118 core, 110 CLI, 30 UI, 12 embed, 9 viewer), 20 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean. Also run for real against a folder, a public GitHub repo and a live website.
+Verified at the end of Phase 6: 304 unit tests pass (118 core, 126 CLI, 30 UI, 12 embed, 9 viewer, 9 studio), 29 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
 
 ## 3. Requirements and quick start
 
@@ -125,11 +125,12 @@ Verified at the end of Phase 5: 279 unit tests pass (118 core, 110 CLI, 30 UI, 1
 npm install
 npm run dev            # viewer with samples at http://localhost:5173
 npm run dev:embed      # web component demo page (packages/embed/index.html)
+npm run dev:studio     # Studio at http://localhost:5174, without the local server features
 npm test               # all unit tests
 npm run e2e            # Playwright, needs a build and `npx playwright install chromium`
 npm run measure        # bundle sizes and generation time, needs a build
 npm run typecheck      # all packages
-npm run build          # viewer -> embed bundle -> cli (order matters)
+npm run build          # viewer -> studio -> embed bundle -> cli (order matters)
 npm run app-lens -- --help
 ```
 
@@ -148,6 +149,7 @@ app-lens/
 │  ├─ embed/     @app-lens/embed  <app-lens> custom element (Shadow DOM), Vite library build -> dist/app-lens.js
 │  └─ cli/       @app-lens/cli    `app-lens` command; esbuild bundle + copies of viewer and embed builds
 ├─ apps/viewer/  @app-lens/viewer Standalone/iframe viewer app (Vite, base './')
+├─ apps/studio/  @app-lens/studio Manifest editor with live preview
 ├─ samples/      *.app-lens.json  Fictional sample apps (InvoiceFlow, TaskPilot), bundled into the viewer
 ├─ HANDOFF.md
 └─ package.json  npm workspaces, root scripts, vite override
@@ -265,6 +267,10 @@ app-lens attach www.example.com
 
 The output is a validated draft plus `app-lens.intake.json`, which lists each item with its evidence and a confidence level. URLs and repos count as third-party unless you pass `--own`: their drafts go to the gitignored `drafts/` folder, carry a not-affiliated notice and a `draft` marker, and `build` refuses them. The viewer's *Attach project* dialog reads folders entirely in the browser. GitHub links and websites need the dev server's `/__app-lens/attach` endpoint, or the CLI.
 
+**Studio.** `app-lens studio [file]` opens a form and JSON editor with a live preview on 127.0.0.1:4318. It shows validation problems you can click to jump to, a quality score, suggestions and undo/redo. With a file it loads and saves that file, and it only saves valid manifests. Without one it autosaves in the browser. Attach and AI drafts both appear as a list of changes to apply or discard.
+
+**AI drafting (optional).** `app-lens ingest readme README.md --ai`, or *Draft with AI* in Studio, sends the text to the Claude API using the official SDK and `claude-opus-5-5`, with server-side refusal fallbacks enabled. It needs `ANTHROPIC_API_KEY` and costs money per run. Replies are validated with `parseManifest`, and problems are sent back up to twice. A person reviews the result.
+
 **Analytics.** Nothing is tracked by default. Pass `onEvent` to `AppLensView`, listen for the `app-lens:event` DOM event on the web component, or listen for `{ type: 'app-lens:event', event }` messages from an iframe. Events: `tab_viewed`, `persona_changed`, `feature_viewed`, `scenario_completed`, `demo_completed`.
 
 ## 7. Product demo (Walkthroughs → "Product demo")
@@ -296,6 +302,8 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
   - The preview server checks the `Host` header to block DNS rebinding.
   - Intake never runs project code, skips secrets and key files, and does not follow symlinks.
   - Website intake blocks non-public addresses on every redirect and connects to the checked address, so a second DNS answer cannot change the target. It respects `robots.txt` and collects page structure only, never body text.
+  - The Studio API needs a loopback `Host`, and writes also need a matching `Origin` and a JSON content type. It binds to 127.0.0.1 and has no authentication, so don't expose it.
+  - Source text sent to Claude is delimited and marked as untrusted, and over-long input is refused rather than cut.
   - GitHub tarballs are parsed by hand: traversal paths abort the extraction, links are never created, and sizes are capped. `GITHUB_TOKEN` is only sent to the GitHub API.
 
 ## 9. Known issues and caveats
@@ -308,6 +316,9 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 - The on-screen demo is a rendered animation. "Download video" records a separate canvas render to WebM in real time, so it takes as long as the demo. MP4 is not produced.
 - Sites that render everything with JavaScript give thin drafts, because intake never runs scripts. A headless mode could come later behind a flag.
 - A folder with a plain README and no routes, specs or schemas gives a thin draft. Monorepos only read the root README and `package.json`.
+- Walkthroughs are edited in Studio's JSON tab, not the form.
+- The Studio preview runs at full speed on every valid edit, so very large manifests will feel slow.
+- The GitHub Pages deployment needs *Settings → Pages → Source: GitHub Actions*. Studio there has no local server, so Save, GitHub and website attach, and AI drafting are unavailable. Folder attach works.
 - PDF export uses the built-in Helvetica font, so text outside Latin is transliterated or replaced with `?`.
 - The `app-lens.mjs` (ES) embed build is not minified; `app-lens.js` (IIFE) is.
 - The viewer bundles samples at build time, so new samples need a rebuild.

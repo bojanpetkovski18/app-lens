@@ -5,7 +5,7 @@ This file records **everything that has been built and changed in AppLens so far
 - [HANDOFF.md](HANDOFF.md) says **what to do next**: the GitHub workflow, the phase plan and the rules.
 - This file says **what already exists, how it was built, and how to rebuild it**.
 
-Last updated: 2026-10-30, after **Phase 5** (see Part A).
+Last updated: 2026-10-30, after **Phase 6** (see Part A).
 
 ---
 
@@ -123,9 +123,19 @@ Elsewhere:
 - `build` refuses a manifest with `draft.thirdParty`. `drafts/` is gitignored.
 - Viewer: *Attach project* dialog, loaded lazily because of the YAML parser, and `attach-endpoint.ts`, a dev-only Vite plugin that shells out to the built CLI with no shell and checks `Host`, `Origin` and content type.
 
+## A.7 Phase 6: Studio (done)
+
+- `apps/studio`: `editor.ts` (undo/redo reducer, `analyze`, `locatePath`), `FormEditor.tsx`, `App.tsx` (JSON tab, problem jumping, suggestions, review step, autosave).
+- `starterManifest` moved to core, and `AttachDialog` moved to `@app-lens/ui/attach` so the viewer and Studio share them.
+- `AppLensView` gained `stateKey`, which keeps the tab and persona across edits. `Showcase` follows `mock.seed` and drops a persona that no longer exists.
+- CLI: `studio.ts` (`app-lens studio`, local API), `ai.ts` (`aiDraft` with the official SDK), and `ingest --ai`. `serveStatic` takes an API handler. The build copies `apps/studio/dist` to `dist/studio`.
+- `.github/workflows/pages.yml` publishes the samples and Studio.
+
 ---
 
 # Part B: Rebuild from scratch
+
+Part B describes the Phase 2 baseline. Apply the changes in Part A, sections A.4 to A.7, on top of it to reach the current code.
 
 Follow the steps in order. File paths are relative to the repo root.
 
@@ -917,7 +927,7 @@ Run these from the repo root. All must pass before PR #1 is opened (HANDOFF sect
 ```bash
 npm install
 npm run typecheck      # every package, 0 errors
-npm test               # 279 tests: 118 core, 110 CLI, 30 UI, 12 embed, 9 viewer
+npm test               # 304 tests: 118 core, 126 CLI, 30 UI, 12 embed, 9 viewer, 9 studio
 npm run build          # viewer -> embed -> cli; Rollup may print zod annotation warnings, which are harmless
 npm run app-lens -- --help
 npm run app-lens -- validate samples/invoiceflow.app-lens.json

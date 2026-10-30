@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AppLens embed demo</title>
+    <style>
+      body { margin: 0; padding: 24px; font-family: system-ui, sans-serif; background: #fff; color: #111; }
+      section { max-width: 1100px; margin: 0 auto 40px; }
+    </style>
+    <script type="module" src="/src/index.tsx"></script>
+    <script type="module" src="/demo/demo.ts"></script>
+  </head>
+  <body>
+    <section>
+      <h2>Manifest set from script</h2>
+      <app-lens id="taskpilot" tab="scenarios"></app-lens>
+    </section>
+    <section>
+      <h2>Inline manifest with theme attributes</h2>
+      <app-lens theme="dark" primary="#e11d48" accent="#f59e0b" radius="6">
+        <script type="application/json">
+          {
+            "app": { "name": "CafeQueue", "tagline": "Order ahead at your local coffee shop", "category": "Food and drink", "currency": "EUR" },
+            "entities": {
+              "Order": {
+                "count": 12,
+                "display": "ticket",
+                "fields": { "ticket": "seq:Q-###", "customer": "firstName", "total": "money:3..18", "status": "enum:placed,brewing,ready,collected" }
+              }
+            },
+            "features": [
+              { "id": "order-ahead", "title": "Order ahead", "description": "Skip the line by ordering from your phone.", "entities": ["Order"], "highlights": ["Saved favourites", "Pick-up times"] },
+              { "id": "queue", "title": "Live queue", "description": "Baristas see every order in sequence.", "entities": ["Order"] }
+            ],
+            "scenarios": [
+              {
+                "id": "coffee-run",
+                "title": "A morning coffee run",
+                "entity": "Order",
+                "steps": [
+                  { "action": "create", "narration": "A regular places an order from the train.", "values": { "status": "placed" } },
+                  { "action": "update", "narration": "The barista starts brewing.", "set": { "status": "brewing" } },
+                  { "action": "update", "narration": "Ready at the counter.", "set": { "status": "ready" } }
+                ]
+              }
+            ],
+            "mock": { "seed": "cafequeue" }
+          }
+        </script>
+      </app-lens>
+    </section>
+  </body>
+</html>

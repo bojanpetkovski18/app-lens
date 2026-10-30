@@ -1,4 +1,5 @@
 import { build, CliError, init, parseCliArgs, preview, schema, validate } from './commands';
+import { attach } from './intake/attach';
 import { diff, exportManifest, ingest, lint } from './smarts';
 
 const VERSION = '0.2.0';
@@ -16,6 +17,9 @@ Usage
   app-lens ingest openapi|prisma|readme <file>       Draft a manifest from an existing spec
                    [--out file] [--report file] [--force]
   app-lens export md|pdf <file> [--out file]         Write a one-pager
+  app-lens attach <folder|github-url|website>        Draft a manifest from an existing project
+                   [--out file] [--report file] [--max-files N] [--max-pages N]
+                   [--dry-run] [--own] [--third-party] [--json]
   app-lens schema [--out file]                       Print or write the manifest JSON schema
 
 Options
@@ -66,6 +70,32 @@ async function main(): Promise<void> {
     case 'ingest':
       ingest(required(), third, values);
       break;
+    case 'attach': {
+      const limit = (value: string | undefined, name: string) => {
+        if (value === undefined) return undefined;
+        const number = Number(value);
+        if (!Number.isInteger(number) || number < 1) throw new CliError(`Invalid ${name} "${value}".`);
+        return number;
+      };
+      const result = await attach(required(), {
+        out: values.out,
+        report: values.report,
+        dryRun: values['dry-run'],
+        own: values.own,
+        thirdParty: values['third-party'],
+        maxFiles: limit(values['max-files'], '--max-files'),
+        maxPages: limit(values['max-pages'], '--max-pages'),
+      });
+      if (values.json) {
+        console.log(JSON.stringify({ manifest: result.manifest, report: result.report, thirdParty: result.thirdParty }));
+      } else {
+        const written = values['dry-run'] ? 'Dry run, nothing written' : `Wrote ${result.out} and ${result.reportPath}`;
+        console.log(`${written}: ${result.report.items.length} items found. Review the draft before you use it.`);
+        if (result.thirdParty) console.log('This is a third-party project, so the draft is marked and cannot be built.');
+        for (const note of result.report.notes) console.log(`  note: ${note}`);
+      }
+      break;
+    }
     case 'export':
       exportManifest(required(), third, values);
       break;

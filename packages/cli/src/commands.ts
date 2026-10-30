@@ -49,6 +49,12 @@ export function parseCliArgs(args: string[]) {
         watch: { type: 'boolean', short: 'w' },
         report: { type: 'string' },
         'min-score': { type: 'string' },
+        'max-files': { type: 'string' },
+        'max-pages': { type: 'string' },
+        'dry-run': { type: 'boolean' },
+        own: { type: 'boolean' },
+        'third-party': { type: 'boolean' },
+        json: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
@@ -146,6 +152,9 @@ function buildSite(file: string, out: string, force: boolean | undefined): Manif
   if (!result.ok) {
     const details = result.issues.map((issue) => `  - ${issue.path}: ${issue.message}`).join('\n');
     throw new CliError(`${file} has ${result.issues.length} problem(s):\n${details}`);
+  }
+  if (result.manifest.draft?.thirdParty) {
+    throw new CliError(`${file} is a draft of a third-party project (${result.manifest.draft.source}), so it cannot be built.`);
   }
   prepareOutDir(out, force);
   const assets = assetRoot();

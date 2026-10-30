@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-30, after **Phase 2**.
+Last updated: 2026-10-30, after **Phase 3**.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -109,23 +109,25 @@ It is a personal project. It must stay **independent of any employer or third-pa
 |---|---|---|---|
 | 1. MVP | Manifest schema and validation, mock data engine, scenario runner, React viewer (Overview, Features, Data, Walkthroughs), persona switch, samples | #1 | Done |
 | 2. Distribution | `@app-lens/ui` shared package, theming (colours, radius, font, light/dark/auto), embedded mode, `<app-lens>` web component, iframe mode, standalone sites, CLI (`init`, `validate`, `build`, `preview`, `schema`), JSON Schema for editors, **product demo video** with a research-progress step | #1 | Done |
-| 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Next |
+| 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Done |
 | 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export | #3 | Later |
 | 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Later |
 | 6. Studio | Visual manifest editor with live preview, optional AI drafting | #5 | Later |
 
-Verified at the end of Phase 2: 48 tests pass (35 core, 13 CLI), typecheck passes in every package, and `npm run build` succeeds.
+Verified at the end of Phase 3: 124 unit tests pass (61 core, 27 CLI, 22 UI, 11 embed, 3 viewer), 9 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean.
 
 ## 3. Requirements and quick start
 
-- Node **18.20+** works. **Node 22 LTS is recommended**, because Node 18 is end-of-life and vitest 4 needs Node 20+.
+- Node **20.19+** is required. **Node 22 LTS is recommended** and is what CI uses.
 - npm 10 (pnpm isn't needed).
 
 ```bash
 npm install
 npm run dev            # viewer with samples at http://localhost:5173
 npm run dev:embed      # web component demo page (packages/embed/index.html)
-npm test               # all tests (core + cli)
+npm test               # all unit tests
+npm run e2e            # Playwright, needs a build and `npx playwright install chromium`
+npm run measure        # bundle sizes and generation time, needs a build
 npm run typecheck      # all packages
 npm run build          # viewer -> embed bundle -> cli (order matters)
 npm run app-lens -- --help
@@ -185,7 +187,7 @@ Unknown keys are rejected. `app-lens init` writes `app-lens.schema.json` so edit
 - **Identifiers and links:** `id`, `seq:INV-####`, `ref:Entity`
 - **Choices and constants:** `enum:a,b,c`, `const:value`
 - **Numbers:** `int:1..10`, `float:0..1`, `money:10..500`, `percent:0..100`
-- **Booleans and dates:** `bool`, `date:-30..30`, `datetime:-7..0` (offsets in days from `mock.baseDate`, which defaults to today)
+- **Booleans and dates:** `bool`, `date:-30..30`, `datetime:-7..0` (offsets in days from `mock.baseDate`, which defaults to today, limited to ±100000 days)
 - **People and organisations:** `fullName`, `firstName`, `lastName`, `email`, `phone`, `company`, `jobTitle`, `city`, `country`
 - **Text:** `codename`, `title`, `word`, `words:2..4`, `sentence:6..12`, `paragraph:2..4`
 
@@ -194,7 +196,7 @@ Unknown keys are rejected. `app-lens init` writes `app-lens.schema.json` so edit
 - Phone numbers use the fictional `555-01xx` range.
 - `ref` targets are generated first. Self-references work, but cycles between entities are rejected.
 
-**Scenario steps:** `create` (with `values`), `select` (with `where`), `update` (with `set`), `delete`, `note`. Values can use `$today` and `$now`.
+**Scenario steps:** `create` (with `values`), `select` (with `where`), `update` (with `set`), `delete`, `note`. Values can use `$today` and `$now`, must match the field kind, and can be `null`.
 
 **Theme** (`app.theme`): `primary`, `accent` (hex), `mode` (`light|dark|auto`), `radius` (0–24), `font` (a plain font stack).
 Hosts can override these with attributes or URL parameters. All values are sanitised.
@@ -210,7 +212,7 @@ Other ways to supply the manifest:
 - set it from script: `el.manifest = object`
 - put inline JSON inside the element: `<script type="application/json">`
 
-The element emits `app-lens:ready` and `app-lens:error` events, and its styles stay inside the Shadow DOM.
+The element emits `app-lens:ready` for a valid manifest and `app-lens:error` for a failed load or an invalid manifest (`detail.issues` lists the problems). Its styles stay inside the Shadow DOM.
 
 **Iframe**
 ```html
@@ -221,7 +223,7 @@ The element emits `app-lens:ready` and `app-lens:error` events, and its styles s
   });
 </script>
 ```
-Supported URL parameters:
+Supported URL parameters (a built site is pinned to its own manifest, so it ignores `manifest` and `source`):
 - `manifest`
 - `source`
 - `embed=1`
@@ -266,10 +268,16 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
   - CLI output is HTML-escaped, with a function replacer so `$&` in a name stays literal.
   - Static serving is protected against path traversal and binds to loopback only.
   - Size limits on counts and fields prevent manifests that freeze the browser.
+  - Manifest names resolve through own properties only, so `constructor` never reaches `Object.prototype`.
+  - Built sites ship a content security policy, and a pinned site ignores `?manifest=` so a link cannot spoof its content.
+  - The preview server checks the `Host` header to block DNS rebinding.
 
 ## 9. Known issues and caveats
 
-- `npm audit` lists advisories in **vitest 3** and **tinypool**. They are dev/test-only, and fixing them needs **vitest 4, which needs Node 20+**. Upgrade Node, then bump `vitest` in `packages/core` and `packages/cli` (planned in Phase 3).
+- Generating the largest allowed manifest (15,000 records with 40 fields) takes about 1.4 seconds on the main thread. Typical manifests take a few milliseconds. A worker could remove the pause if real manifests get that large.
+- Repeat builds into the same folder leave old hashed assets behind, because `build` never deletes files.
+- Fetched manifests have no byte limit. The schema limits what gets rendered, not what gets downloaded.
+- `app-lens:resize` posts to `'*'` on purpose: the viewer can't know its embedder, and the message only carries a height.
 - Validation runs in two stages. If the schema stage fails, reference checks (unknown refs, personas) are only reported after those errors are fixed.
 - The demo is a rendered animation, not an MP4 file. Background tabs slow its `requestAnimationFrame` clock, which is expected.
 - The `app-lens.mjs` (ES) embed build is not minified; `app-lens.js` (IIFE) is.
@@ -279,7 +287,7 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 
 **Housekeeping (do first on a new machine)**
 1. Done: the GitHub repo exists and PR #1 holds everything so far, including `LICENSE` and `README.md`.
-2. After PR #1 is merged, start Phase 3 on a new branch.
+2. Done: Phase 3 is in PR #2.
 
 **Phase 3: Code review (senior software developer)**
 

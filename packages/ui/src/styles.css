@@ -233,6 +233,10 @@
 .al-root .al-alert-error { background: var(--al-error-bg); border-color: var(--al-error-border); color: var(--al-error-text); }
 .al-root .al-issues { display: flex; flex-direction: column; gap: 3px; padding: 6px 0 0 18px; }
 
+/* Dialog */
+.al-dialog-root { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 45%); font-family: system-ui, sans-serif; }
+.al-root .al-dialog, .al-dialog { width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+
 /* Picker */
 .al-root .al-picker select { max-width: 240px; padding: 6px 10px; border: 1px solid var(--al-border); border-radius: calc(var(--al-radius) - 3px); background: var(--al-surface); color: var(--al-text); font: inherit; }
 

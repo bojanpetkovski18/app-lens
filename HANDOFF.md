@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-30, after **Phase 3**.
+Last updated: 2026-10-30, after **Phase 4**.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -110,11 +110,11 @@ It is a personal project. It must stay **independent of any employer or third-pa
 | 1. MVP | Manifest schema and validation, mock data engine, scenario runner, React viewer (Overview, Features, Data, Walkthroughs), persona switch, samples | #1 | Done |
 | 2. Distribution | `@app-lens/ui` shared package, theming (colours, radius, font, light/dark/auto), embedded mode, `<app-lens>` web component, iframe mode, standalone sites, CLI (`init`, `validate`, `build`, `preview`, `schema`), JSON Schema for editors, **product demo video** with a research-progress step | #1 | Done |
 | 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Done |
-| 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export | #3 | Later |
+| 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export; plus `lint`, `diff`, CSV/JSON record export and `preview --watch` | #3 | Done |
 | 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Later |
 | 6. Studio | Visual manifest editor with live preview, optional AI drafting | #5 | Later |
 
-Verified at the end of Phase 3: 124 unit tests pass (61 core, 27 CLI, 22 UI, 11 embed, 3 viewer), 9 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean.
+Verified at the end of Phase 4: 173 unit tests pass (90 core, 38 CLI, 30 UI, 12 embed, 3 viewer), 17 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean.
 
 ## 3. Requirements and quick start
 
@@ -180,7 +180,7 @@ Key files:
 
 ## 5. Manifest reference
 
-Top-level keys: `app` (required), `attribution`, `personas`, `entities`, `features`, `scenarios`, `integrations`, `mock`.
+Top-level keys: `app` (required), `attribution`, `draft`, `personas`, `entities`, `features`, `scenarios`, `integrations`, `mock`. `draft` marks a manifest drafted from a project you do not own.
 Unknown keys are rejected. `app-lens init` writes `app-lens.schema.json` so editors can autocomplete.
 
 **Field kinds** (`"field": "kind:args"`):
@@ -244,6 +244,16 @@ app-lens preview app-lens.json                     # build to temp + serve on 12
 ```
 `build` refuses to write into a non-empty folder it didn't create unless you pass `--force`. It never deletes files.
 
+```bash
+app-lens preview app-lens.json --watch             # rebuild and reload the page on save
+app-lens lint app-lens.json --min-score 80         # score it, and fail CI below 80
+app-lens diff old.json new.json                    # what changed
+app-lens ingest openapi spec.yaml --out draft.json # also: prisma, readme
+app-lens export pdf app-lens.json                  # also: md, with a Mermaid data model
+```
+
+**Analytics.** Nothing is tracked by default. Pass `onEvent` to `AppLensView`, listen for the `app-lens:event` DOM event on the web component, or listen for `{ type: 'app-lens:event', event }` messages from an iframe. Events: `tab_viewed`, `persona_changed`, `feature_viewed`, `scenario_completed`, `demo_completed`.
+
 ## 7. Product demo (Walkthroughs → "Product demo")
 
 1. **Poster:** the user clicks *Generate demo*.
@@ -279,7 +289,8 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 - Fetched manifests have no byte limit. The schema limits what gets rendered, not what gets downloaded.
 - `app-lens:resize` posts to `'*'` on purpose: the viewer can't know its embedder, and the message only carries a height.
 - Validation runs in two stages. If the schema stage fails, reference checks (unknown refs, personas) are only reported after those errors are fixed.
-- The demo is a rendered animation, not an MP4 file. Background tabs slow its `requestAnimationFrame` clock, which is expected.
+- The on-screen demo is a rendered animation. "Download video" records a separate canvas render to WebM in real time, so it takes as long as the demo. MP4 is not produced.
+- PDF export uses the built-in Helvetica font, so text outside Latin is transliterated or replaced with `?`.
 - The `app-lens.mjs` (ES) embed build is not minified; `app-lens.js` (IIFE) is.
 - The viewer bundles samples at build time, so new samples need a rebuild.
 

@@ -1,7 +1,7 @@
 import { manifestJsonSchema, parseManifest, type Manifest } from '@app-lens/core';
 import { createHash } from 'node:crypto';
-import { cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import { cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from 'node:fs';
+import { createServer, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +33,7 @@ interface Options {
   force?: boolean;
   name?: string;
   port?: string;
+  watch?: boolean;
 }
 
 export function parseCliArgs(args: string[]) {
@@ -45,6 +46,9 @@ export function parseCliArgs(args: string[]) {
         force: { type: 'boolean', short: 'f' },
         name: { type: 'string' },
         port: { type: 'string', short: 'p' },
+        watch: { type: 'boolean', short: 'w' },
+        report: { type: 'string' },
+        'min-score': { type: 'string' },
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
@@ -58,7 +62,7 @@ function assetRoot(): string {
   return dirname(fileURLToPath(import.meta.url));
 }
 
-function readManifestFile(file: string): unknown {
+export function readManifestFile(file: string): unknown {
   if (!existsSync(file)) throw new CliError(`File not found: ${file}`);
   if (statSync(file).isDirectory()) throw new CliError(`${file} is a folder. Pass a manifest file.`);
   const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
@@ -69,7 +73,8 @@ function readManifestFile(file: string): unknown {
   }
 }
 
-function writeJson(file: string, value: unknown): void {
+export function writeJson(file: string, value: unknown): void {
+  mkdirSync(dirname(resolve(file)), { recursive: true });
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
@@ -180,11 +185,36 @@ export function isAllowedHost(host: string | undefined): boolean {
   return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host ?? '');
 }
 
-export function serveStatic(root: string, port: number): Promise<Server> {
+const LIVE_PATH = '/__app-lens/live';
+const LIVE_SCRIPT_PATH = '/__app-lens/live.js';
+const LIVE_SCRIPT = `new EventSource('${LIVE_PATH}').onmessage = () => location.reload();`;
+
+export interface LiveReload {
+  reload: () => void;
+}
+
+/** Serves a folder. With `live`, pages reload when the returned handle's `reload` is called. */
+export function serveStatic(root: string, port: number, live?: (handle: LiveReload) => void): Promise<Server> {
+  const clients = new Set<ServerResponse>();
+  live?.({ reload: () => clients.forEach((client) => client.write('data: reload\n\n')) });
+
   const server = createServer((request, response) => {
     if (!isAllowedHost(request.headers.host)) {
       response.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       response.end('Forbidden');
+      return;
+    }
+    const path = (request.url ?? '/').split('?')[0];
+    if (live && path === LIVE_PATH) {
+      response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
+      response.write(': connected\n\n');
+      clients.add(response);
+      request.on('close', () => clients.delete(response));
+      return;
+    }
+    if (live && path === LIVE_SCRIPT_PATH) {
+      response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+      response.end(LIVE_SCRIPT);
       return;
     }
     let file = resolveStaticPath(root, request.url ?? '/');
@@ -199,6 +229,10 @@ export function serveStatic(root: string, port: number): Promise<Server> {
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
     });
+    if (live && file.endsWith('index.html')) {
+      response.end(readFileSync(file, 'utf8').replace('</head>', () => `<script src="${LIVE_SCRIPT_PATH}"></script></head>`));
+      return;
+    }
     createReadStream(file)
       .on('error', () => response.destroy())
       .pipe(response);
@@ -209,6 +243,28 @@ export function serveStatic(root: string, port: number): Promise<Server> {
       reject(error.code === 'EADDRINUSE' ? new CliError(`Port ${port} is already in use. Pick another with --port.`) : error);
     });
     server.listen(port, '127.0.0.1', () => resolvePromise(server));
+  });
+}
+
+const WATCH_DEBOUNCE_MS = 120;
+
+/** Editors often replace a file instead of writing it, so the folder is watched, not the file. */
+function watchManifest(file: string, root: string, onBuilt: () => void): void {
+  const name = basename(file);
+  let timer: NodeJS.Timeout | undefined;
+  watch(dirname(resolve(file)), (_event, changed) => {
+    if (changed !== name) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      try {
+        buildSite(file, root, true);
+        console.log(`Rebuilt ${name}`);
+        onBuilt();
+      } catch (error) {
+        // A half-typed manifest is normal while editing, so the server keeps running.
+        console.error(`app-lens: ${(error as Error).message}`);
+      }
+    }, WATCH_DEBOUNCE_MS);
   });
 }
 
@@ -225,7 +281,11 @@ export async function preview(target: string, options: Options = {}): Promise<vo
   }
   if (!existsSync(join(root, 'index.html'))) throw new CliError(`${root} has no index.html.`);
 
-  await serveStatic(root, port);
+  const isFile = root !== target;
+  if (options.watch && !isFile) throw new CliError('--watch needs a manifest file, not a folder.');
+  let live: LiveReload | undefined;
+  await serveStatic(root, port, options.watch ? (handle) => { live = handle; } : undefined);
   const url = `http://127.0.0.1:${port}/`;
   console.log(`Previewing ${basename(resolve(target))}:\n  ${url}\n  ${url}?embed=1&theme=dark   (iframe mode)\n\nPress Ctrl+C to stop.`);
+  if (options.watch) watchManifest(target, root, () => live?.reload());
 }

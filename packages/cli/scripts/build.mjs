@@ -26,7 +26,10 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  banner: { js: '#!/usr/bin/env node' },
+  // Bundled CommonJS dependencies call require, which an ES module does not have.
+  banner: {
+    js: ['#!/usr/bin/env node', "import { createRequire } from 'node:module';", 'const require = createRequire(import.meta.url);'].join('\n'),
+  },
   logLevel: 'warning',
 });
 

@@ -18,9 +18,14 @@ test('switches samples and filters by persona', async ({ page }) => {
 
 test('searches data and follows a reference', async ({ page }) => {
   await page.goto('/?tab=data');
-  await page.getByRole('searchbox').fill('Labs');
+  await page.getByRole('navigation', { name: 'Data types' }).getByRole('button', { name: /Invoice/ }).click();
+  await page.getByRole('searchbox').fill('INV-0001');
+  await expect(page.locator('table.al-table tbody tr')).toHaveCount(1);
   await page.locator('table.al-table tbody tr').first().click();
-  await expect(page.getByRole('complementary', { name: 'Record details' })).toBeVisible();
+  const details = page.getByRole('complementary', { name: 'Record details' });
+  await details.locator('.al-link').click();
+  await expect(page.getByRole('navigation', { name: 'Data types' }).locator('[aria-current=true]')).toContainText('Customer');
+  await expect(page.getByRole('searchbox')).toHaveValue('');
 });
 
 test('generates the demo and seeks with the keyboard', async ({ page }) => {

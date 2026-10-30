@@ -23,6 +23,7 @@ function report(label, path) {
 }
 
 report('apps/viewer/dist', join(root, 'apps/viewer/dist'));
+report('apps/studio/dist', join(root, 'apps/studio/dist'));
 report('embed app-lens.js', join(root, 'packages/embed/dist/app-lens.js'));
 report('cli cli.js', join(root, 'packages/cli/dist/cli.js'));
 

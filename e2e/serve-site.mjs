@@ -1,6 +1,6 @@
 // Builds a real site, adds a page that loads the web component before its markup, and serves both.
 import { execFileSync, spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { cpSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,4 +20,7 @@ writeFileSync(join(out, 'embed.html'), `<!doctype html>
 </body></html>
 `);
 
+const opened = join(root, 'dist/e2e-opened.json');
+cpSync(join(root, 'samples/taskpilot.app-lens.json'), opened);
+spawn(process.execPath, [cli, 'studio', opened, '--port', '4413'], { stdio: 'inherit' });
 spawn(process.execPath, [cli, 'preview', out, '--port', '4411'], { stdio: 'inherit' });

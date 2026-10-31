@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-31, after **Phase 6**.
+Last updated: 2026-10-31, before the 1.0.0 release.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -62,7 +62,7 @@ It is a personal project. It must stay **independent of any employer or third-pa
 | 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | `phase-5/project-intake` | Merged into `dev` |
 | 6. Studio | Visual manifest editor with live preview, optional AI drafting, `app-lens studio`, and a GitHub Pages workflow | `phase-6/studio` | Merged into `dev` |
 
-Verified at the end of Phase 6: 304 unit tests pass (118 core, 126 CLI, 30 UI, 12 embed, 9 viewer, 9 studio), 29 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
+Verified on 2026-10-31: 308 unit tests pass (118 core, 126 CLI, 30 UI, 13 embed, 12 viewer, 9 studio), 190 Playwright e2e tests pass, typecheck and lint pass, `npm run build` succeeds, and `npm audit --omit=dev` reports 0. See [PROGRESS.md](PROGRESS.md) for current numbers. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
 
 ## 3. Requirements and quick start
 

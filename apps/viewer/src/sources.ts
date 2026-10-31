@@ -1,4 +1,5 @@
 import { fetchManifest } from '@app-lens/ui';
+
 export interface ManifestSource {
   key: string;
   label: string;

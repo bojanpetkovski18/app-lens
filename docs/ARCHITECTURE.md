@@ -94,4 +94,4 @@ Each reply goes through `parseManifest`. Problems are sent back up to twice, wit
 
 `app-lens build` writes a static site with a Content-Security-Policy meta tag. `preview` serves files with `X-Content-Type-Options: nosniff`, and `--watch` adds live reload over server-sent events.
 
-GitHub Actions runs `ci.yml` on PRs and on pushes to `dev` and `main`. `pages.yml` publishes the fictional samples and Studio on pushes to `main`.
+GitHub Actions runs `ci.yml` on PRs and on pushes to `dev` and `main`, with jobs for verification, a full-history secret scan and repository lint. `pages.yml` publishes the fictional samples and Studio on pushes to `main`.

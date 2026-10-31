@@ -13,6 +13,7 @@ Last updated: 2026-10-31.
 | Phase 6: Studio | `phase-6/studio` | Merged into `dev` |
 | Run CI on `dev` | `#0007-run-ci-on-dev` | Merged, PR #1 |
 | Docs and AI-assistance note | `#0008-docs-and-ai-assistance-note` | In review |
+| CI pinning, secret scan and lint | `#0009-ci-pinning-secret-scan-and-lint` | In review |
 
 ## Measured results
 
@@ -31,9 +32,9 @@ Last updated: 2026-10-31.
 ## Before the first release
 
 - [ ] One live AI drafting run by the owner. It needs `ANTHROPIC_API_KEY`
-- [ ] Full-history secret scan and a scan job in CI
-- [ ] Pinned CI actions and exact dependency versions
-- [ ] Linting and an editor config
+- [x] Scan job in CI. Its first full-history result arrives with the PR
+- [x] Pinned CI actions and exact dependency versions
+- [x] Linting and an editor config
 - [ ] Polish audit in `docs/AUDIT.md`
 - [ ] Byte limit on fetched manifests
 - [ ] Version set for the release
@@ -43,6 +44,7 @@ Last updated: 2026-10-31.
 The full list is in `HANDOFF.md` section 9.
 
 - AI drafting has only run against a fake client.
+- `npm audit` reports 11 moderate dev-only issues from one `minimatch` advisory, and production dependencies report 0. See D016.
 - Generating 15,000 records measured 1409 ms after Phase 3 and 1630 ms now. It has not been investigated, and it may be noise.
 
 ## Next step

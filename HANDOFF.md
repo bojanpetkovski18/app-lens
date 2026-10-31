@@ -84,7 +84,7 @@ npm run app-lens -- --help
 
 Gotchas:
 - `npm run dev -- --port X` does not work, because the extra argument becomes the Vite root. Use plain `npm run dev`.
-- If two Vite versions get installed (TS2769 in `vite.config.ts`), run `npm dedupe`. The root `overrides` pins `vite ^6.4.5`.
+- If two Vite versions get installed (TS2769 in `vite.config.ts`), run `npm dedupe`. The root `overrides` pins `vite 6.4.5`.
 - After moving or renaming the folder, run `npm install` again. Workspace links are absolute junctions on Windows.
 
 ## 4. Repository layout

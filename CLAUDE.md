@@ -19,6 +19,7 @@ Verified on 2026-10-31 on Windows with Node 24.20.0. CI runs them on Linux with 
 ```bash
 npm ci
 npm run typecheck
+npm run lint
 npm test
 npm run build
 npm audit --audit-level=high
@@ -38,6 +39,7 @@ Run all of them before pushing, and let a failure stop the push. CI does not run
 - For a bug, write the regression test first and show it failing.
 - Never delete, skip or weaken a test to get green.
 - Measure a number before writing it down, and record it in `PROGRESS.md`.
+- Pin exact versions, and pin CI actions to a commit SHA.
 - Add new dependencies only when they are at least two weeks old, and check the publish date.
 
 ## Hard limits

@@ -105,3 +105,35 @@ Numbered, and never renumbered. D001 to D012 were written up on 2026-10-31 from 
 - **Why:** The owner asked for `dev`, and it matches their other projects and the project playbook.
 - **Alternatives:** The stacked PRs into `main` planned in the handoff.
 - **Trade-offs:** The phase branches were merged into `dev` directly, without PR review.
+
+## D014: Hold the Claude SDK at 0.135.0
+
+- **Date:** 2026-10-31
+- **Decision:** Use `@anthropic-ai/sdk` 0.135.0 instead of 1.3.0.
+- **Why:** Every 1.x release was under two weeks old, which breaks the dependency rule. `ai.ts` type-checks and its tests pass on 0.135.0.
+- **Alternatives:** Keep 1.3.0 as an exception.
+- **Trade-offs:** It stays on the last 0.x line until 1.x has aged, and the fake client can't show that the live API accepts every parameter.
+
+## D015: Keep Vite at 6.4.5 under the security exception
+
+- **Date:** 2026-10-31
+- **Decision:** Keep `vite` 6.4.5, published 2026-10-21, as an exact version.
+- **Why:** 6.4.4 has GHSA-8g5g-mxqh-grgj, so `npm audit` flags it. The playbook allows a security patch under two weeks old with the owner's approval.
+- **Alternatives:** 6.4.4, which reintroduces the advisory.
+- **Trade-offs:** It's younger than the rule until 2026-11-04. The owner reviews this in the PR.
+
+## D016: Accept the dev-only minimatch advisory for now
+
+- **Date:** 2026-10-31
+- **Decision:** Leave `minimatch` 10.2.6, which ESLint requires, despite GHSA-g3hv-75wg-m249.
+- **Why:** The denial of service needs attacker-controlled glob patterns, and ESLint here only reads patterns from this repository's config. `npm audit --omit=dev` reports 0. The fix is a new major version from 2026-10-27, outside what ESLint declares.
+- **Alternatives:** Override to `minimatch` 11, or remove ESLint.
+- **Trade-offs:** `npm audit` reports 11 moderate issues, all from this one advisory, until ESLint moves. CI fails on `high`, so it still passes. Recheck after 2026-11-10.
+
+## D017: ESLint without Prettier
+
+- **Date:** 2026-10-31
+- **Decision:** Add ESLint with the recommended and React Hooks rules, plus `.editorconfig`. Don't add a formatter.
+- **Why:** Prettier would rewrite most of the code base with no change in behaviour, and the long-line house style is deliberate.
+- **Alternatives:** Prettier with a wide print width.
+- **Trade-offs:** Formatting relies on review. The editorconfig check skips indent size, because continuation lines are aligned by hand.

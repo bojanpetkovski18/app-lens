@@ -135,6 +135,7 @@ Elsewhere:
 
 - Added a `dev` branch and merged every phase into it. `dev` is now the default branch, CI runs on pushes to it, and new work uses `#00nn-...` branches.
 - Added `CLAUDE.md`, `PROGRESS.md`, `DECISIONS.md` and `docs/ARCHITECTURE.md`, plus an AI-assistance note in the README. HANDOFF section 0 now describes the workflow in use.
+- Pinned CI actions to commit SHAs and direct dependencies to exact versions. CI gained ESLint, a gitleaks scan of the full history, actionlint and editorconfig-checker.
 
 ---
 
@@ -165,7 +166,7 @@ Follow the steps in order. File paths are relative to the repo root.
     "app-lens": "node packages/cli/dist/cli.js"
   },
   "devDependencies": { "@types/node": "^18.19.64", "typescript": "^5.6.3" },
-  "overrides": { "vite": "^6.4.5" }
+  "overrides": { "vite": "6.4.5" }
 }
 ```
 The workspace order matters: core, ui, embed, viewer, cli. The build order is **viewer, then embed, then cli**, because the CLI build copies the other two outputs.
@@ -745,7 +746,7 @@ Both samples are fictional and say so in their description. The viewer bundles e
 `apps/viewer/package.json`:
 - `name` is `@app-lens/viewer`, private, `type: module`.
 - Scripts: `dev` (`vite`), `build` (`tsc --noEmit && vite build`), `preview`, `typecheck`.
-- Dependencies: core, ui, `react` and `react-dom` `^18.3.1`. Dev dependencies: React types, `@vitejs/plugin-react ^4.7.0`, `vite ^6.4.5`.
+- Dependencies: core, ui, `react` and `react-dom` `^18.3.1`. Dev dependencies: React types, `@vitejs/plugin-react 4.7.0`, `vite 6.4.5`. Part B shows the original `^` ranges for other packages; `package.json` now holds exact versions.
 
 `tsconfig.json`: the DOM libs, `jsx: react-jsx`, `types: ["vite/client", "node"]`, includes `src` and `vite.config.ts`.
 

@@ -1,0 +1,184 @@
+import { manifestJsonSchema, parseManifest, type Manifest } from '@app-lens/core';
+import { createHash } from 'node:crypto';
+import { cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import { basename, dirname, extname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { starterManifest } from './template';
+
+export class CliError extends Error {}
+
+const SITE_MARKER = '.app-lens-site';
+const DEFAULT_OUT = 'app-lens-site';
+const DEFAULT_PORT = 4317;
+
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon',
+};
+
+interface Options {
+  out?: string;
+  force?: boolean;
+  name?: string;
+  port?: string;
+}
+
+function assetRoot(): string {
+  return dirname(fileURLToPath(import.meta.url));
+}
+
+function readManifestFile(file: string): unknown {
+  if (!existsSync(file)) throw new CliError(`File not found: ${file}`);
+  const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new CliError(`${file} is not valid JSON: ${(error as Error).message}`);
+  }
+}
+
+function writeJson(file: string, value: unknown): void {
+  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+export function init(file = 'app-lens.json', options: Options = {}): void {
+  if (existsSync(file) && !options.force) throw new CliError(`${file} already exists. Use --force to overwrite it.`);
+  const manifest = starterManifest(options.name ?? 'My App');
+  const result = parseManifest(manifest);
+  if (!result.ok) throw new Error(`Starter manifest is invalid: ${JSON.stringify(result.issues)}`);
+  writeJson(file, manifest);
+  writeJson(join(dirname(file), 'app-lens.schema.json'), manifestJsonSchema());
+  console.log(`Created ${file} and app-lens.schema.json.\n\nNext steps:\n  app-lens validate ${file}\n  app-lens preview ${file}`);
+}
+
+export function validate(file: string): boolean {
+  const result = parseManifest(readManifestFile(file));
+  if (!result.ok) {
+    console.error(`ERROR ${file} has ${result.issues.length} problem(s):`);
+    for (const issue of result.issues) console.error(`  - ${issue.path}: ${issue.message}`);
+    return false;
+  }
+  const { features, personas, entities, scenarios } = result.manifest;
+  console.log(
+    `OK ${file} is valid: ${features.length} features, ${personas.length} personas, ` +
+      `${Object.keys(entities).length} data types, ${scenarios.length} walkthroughs.`,
+  );
+  return true;
+}
+
+export function schema(options: Options = {}): void {
+  if (options.out) {
+    writeJson(options.out, manifestJsonSchema());
+    console.log(`Wrote ${options.out}`);
+  } else {
+    console.log(JSON.stringify(manifestJsonSchema(), null, 2));
+  }
+}
+
+export function escapeHtml(value: string): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return value.replace(/[&<>"']/g, (char) => entities[char] as string);
+}
+
+/** Uses a function replacer so "$&" in a name stays literal. */
+export function pinManifest(html: string, appName: string): string {
+  const head = `<title>${escapeHtml(appName)} · AppLens</title>\n    <meta name="app-lens-manifest" content="manifest.json" />`;
+  return html.replace(/<title>[\s\S]*?<\/title>/, () => head);
+}
+
+function prepareOutDir(out: string, force: boolean | undefined): void {
+  if (!existsSync(out)) {
+    mkdirSync(out, { recursive: true });
+    return;
+  }
+  if (!statSync(out).isDirectory()) throw new CliError(`${out} exists and is not a folder.`);
+  const files = readdirSync(out);
+  if (files.length > 0 && !files.includes(SITE_MARKER) && !force) {
+    throw new CliError(`${out} is not empty and was not created by AppLens. Use --force to write into it anyway.`);
+  }
+}
+
+function buildSite(file: string, out: string, force: boolean | undefined): Manifest {
+  const manifest = readManifestFile(file);
+  const result = parseManifest(manifest);
+  if (!result.ok) {
+    const details = result.issues.map((issue) => `  - ${issue.path}: ${issue.message}`).join('\n');
+    throw new CliError(`${file} has ${result.issues.length} problem(s):\n${details}`);
+  }
+  prepareOutDir(out, force);
+  const assets = assetRoot();
+  cpSync(join(assets, 'viewer'), out, { recursive: true });
+  const index = join(out, 'index.html');
+  writeFileSync(index, pinManifest(readFileSync(index, 'utf8'), result.manifest.app.name));
+  writeJson(join(out, 'manifest.json'), manifest);
+  cpSync(join(assets, 'embed/app-lens.js'), join(out, 'app-lens.js'));
+  writeFileSync(join(out, SITE_MARKER), 'Generated by AppLens.\n');
+  return result.manifest;
+}
+
+export function build(file: string, options: Options = {}): void {
+  const out = options.out ?? DEFAULT_OUT;
+  const manifest = buildSite(file, out, options.force);
+  console.log(`Built the ${manifest.app.name} showcase in ${out}:`);
+  console.log('  index.html     standalone site (add ?embed=1 for iframes)');
+  console.log('  manifest.json  your manifest');
+  console.log('  app-lens.js    <app-lens> web component');
+}
+
+export function resolveStaticPath(root: string, urlPath: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(urlPath.split('?')[0] ?? '/');
+  } catch {
+    return null;
+  }
+  if (decoded.includes('\0')) return null;
+  const base = resolve(root);
+  const candidate = resolve(base, `.${decoded.replace(/\\/g, '/')}`);
+  return candidate === base || candidate.startsWith(base + sep) ? candidate : null;
+}
+
+export async function preview(target: string, options: Options = {}): Promise<void> {
+  const port = options.port === undefined ? DEFAULT_PORT : Number(options.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CliError(`Invalid port "${options.port}".`);
+  if (!existsSync(target)) throw new CliError(`Not found: ${target}`);
+
+  let root = target;
+  if (!statSync(target).isDirectory()) {
+    const key = createHash('sha1').update(resolve(target)).digest('hex').slice(0, 10);
+    root = join(tmpdir(), `app-lens-preview-${key}`);
+    buildSite(target, root, true);
+  }
+  if (!existsSync(join(root, 'index.html'))) throw new CliError(`${root} has no index.html.`);
+
+  const server = createServer((request, response) => {
+    let file = resolveStaticPath(root, request.url ?? '/');
+    if (file && existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+    if (!file || !existsSync(file)) {
+      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      response.end('Not found');
+      return;
+    }
+    response.writeHead(200, {
+      'Content-Type': MIME_TYPES[extname(file)] ?? 'application/octet-stream',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    createReadStream(file).pipe(response);
+  });
+
+  await new Promise<void>((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolvePromise);
+  });
+  const url = `http://127.0.0.1:${port}/`;
+  console.log(`Previewing ${basename(resolve(target))}:\n  ${url}\n  ${url}?embed=1&theme=dark   (iframe mode)\n\nPress Ctrl+C to stop.`);
+}

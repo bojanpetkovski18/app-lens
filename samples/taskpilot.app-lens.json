@@ -1,0 +1,62 @@
+{
+  "app": {
+    "name": "TaskPilot",
+    "tagline": "Lightweight project planning for product teams",
+    "description": "TaskPilot keeps tasks, projects and people in one simple view so teams always know what is next. This is a fictional sample app bundled with AppLens.",
+    "category": "Productivity",
+    "version": "1.8",
+    "theme": { "primary": "#0f766e", "accent": "#f59e0b" }
+  },
+  "personas": [
+    { "id": "lead", "label": "Team lead", "description": "Plans the work and keeps projects on track.", "goals": ["Plan sprints quickly", "Spot risks early"] },
+    { "id": "member", "label": "Team member", "description": "Picks up tasks and gets them done.", "goals": ["Know what to do next", "Keep status up to date without meetings"] },
+    { "id": "stakeholder", "label": "Stakeholder", "description": "Follows progress from outside the team.", "goals": ["See progress without asking"] }
+  ],
+  "entities": {
+    "Member": {
+      "count": 8, "display": "name", "description": "People on the team.",
+      "fields": { "name": "fullName", "email": "email", "role": "jobTitle", "location": "city" }
+    },
+    "Project": {
+      "count": 4, "display": "name", "description": "Larger goals that tasks roll up to.",
+      "fields": { "name": "codename", "owner": "ref:Member", "progress": "percent:5..95", "health": "enum:on track,at risk,off track" }
+    },
+    "Task": {
+      "count": 24, "display": "key", "description": "Units of work on the board.",
+      "fields": { "key": "seq:TP-###", "title": "title", "project": "ref:Project", "assignee": "ref:Member", "priority": "enum:low,medium,high,urgent", "status": "enum:backlog,todo,in progress,review,done", "estimate": "int:1..13", "due": "date:-5..30" }
+    }
+  },
+  "features": [
+    { "id": "boards", "title": "Boards and lists", "description": "Drag tasks across a board or work from a focused list.", "category": "Planning", "personas": ["lead", "member"], "entities": ["Task"], "highlights": ["Custom columns", "Quick filters", "Keyboard shortcuts"] },
+    { "id": "sprints", "title": "Sprint planning", "description": "Balance work against capacity before the sprint starts.", "category": "Planning", "tier": "Team", "personas": ["lead"], "entities": ["Task", "Project"], "highlights": ["Capacity view", "Carry-over suggestions"] },
+    { "id": "health", "title": "Project health", "description": "Every project shows its progress and risk at a glance.", "category": "Insights", "personas": ["lead", "stakeholder"], "entities": ["Project"], "highlights": ["On track, at risk or off track", "Weekly summaries"] },
+    { "id": "my-work", "title": "My work", "description": "One list with everything assigned to you, sorted by what matters.", "category": "Execution", "personas": ["member"], "entities": ["Task"], "highlights": ["Due dates first", "Focus mode"] },
+    { "id": "share-links", "title": "Read-only share links", "description": "Share progress with anyone, no account required.", "category": "Collaboration", "tier": "Business", "personas": ["stakeholder", "lead"], "highlights": ["Expiring links", "Hidden fields"] }
+  ],
+  "scenarios": [
+    {
+      "id": "plan-task", "title": "Plan a task through to done", "persona": "lead", "entity": "Task",
+      "description": "Follow one task across the whole board.",
+      "steps": [
+        { "action": "create", "narration": "Capture a new task in the backlog.", "values": { "status": "backlog", "priority": "medium" } },
+        { "action": "update", "narration": "Prioritise it and estimate the effort.", "set": { "status": "todo", "priority": "high", "estimate": 5 } },
+        { "action": "update", "narration": "Work starts.", "set": { "status": "in progress" } },
+        { "action": "update", "narration": "Ready for review.", "set": { "status": "review" } },
+        { "action": "update", "narration": "Reviewed and done.", "set": { "status": "done" } }
+      ]
+    },
+    {
+      "id": "pick-up-work", "title": "Pick up the next task", "persona": "member", "entity": "Task",
+      "steps": [
+        { "action": "select", "narration": "Open the next task in the todo column.", "where": { "status": "todo" } },
+        { "action": "update", "narration": "Move it to in progress.", "set": { "status": "in progress" } }
+      ]
+    }
+  ],
+  "integrations": [
+    { "name": "Code hosting", "category": "Engineering", "description": "Links commits to tasks." },
+    { "name": "Team chat", "category": "Messaging", "description": "Posts status updates." },
+    { "name": "Calendar", "category": "Productivity", "description": "Shows due dates." }
+  ],
+  "mock": { "seed": "taskpilot" }
+}

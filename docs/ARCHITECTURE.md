@@ -69,18 +69,22 @@ Zod runs without its JIT, so its startup test for `eval` never trips a strict po
 
 The SSRF guard in `cli/intake/net.ts` checks addresses against a `BlockList` and pins the lookup for each connection, including redirects.
 
+Patterns from `robots.txt` and `.gitignore` go through `matchesWildcard` in `cli/intake/wildcard.ts`, because a regular expression built from a crafted pattern may never finish. Fetches have an idle timeout and a total limit of three times that.
+
+If the first page redirects to another host, the crawl continues on that host with its `robots.txt`.
+
 Drafts of projects the owner doesn't claim get a `draft.thirdParty` marker. They go to the gitignored `drafts/` folder, and `build` refuses them.
 
 ## Studio
 
-`apps/studio/src/editor.ts` is a reducer holding the manifest as text, with undo and redo capped at 100 entries. The form edits a copy of the parsed value and writes it back as text, so the JSON and form tabs can't drift apart. The preview keeps the last valid manifest while an edit is broken. Drafts from attach and AI go through a review step before they change anything.
+`apps/studio/src/editor.ts` is a reducer holding the manifest as text, with undo and redo capped at 100 entries. The form edits a copy of the parsed value and writes it back as text, so the JSON and form tabs can't drift apart. `canUseForm` checks the shape first, and Form is disabled if the value would crash it. Renames and removals go through helpers that update whatever points at the item. The preview keeps the last valid manifest while an edit is broken. Drafts from attach and AI go through a review step before they change anything.
 
 `app-lens studio [file]` serves the build on `127.0.0.1:4318` with these routes:
 
 | Route | Purpose |
 |---|---|
 | `GET /__app-lens/manifest` | Load the file named on the command line |
-| `PUT /__app-lens/manifest` | Save, valid manifests only |
+| `PUT /__app-lens/manifest` | Save, valid manifests only. Writes a temporary file and renames it |
 | `POST /__app-lens/attach` | Run intake |
 | `POST /__app-lens/draft` | Run AI drafting |
 

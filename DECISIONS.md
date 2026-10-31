@@ -153,3 +153,11 @@ Numbered, and never renumbered. D001 to D012 were written up on 2026-10-31 from 
 - **Why:** A one-off audit goes stale with the next change, and playbook mistakes came from overlays that were never opened.
 - **Alternatives:** A manual checklist.
 - **Trade-offs:** It adds 161 tests, and 46 seconds locally for the full e2e suite.
+
+## D020: Limit fetched manifests to 5 MB
+
+- **Date:** 2026-10-31
+- **Decision:** Viewer and web component share `fetchManifest`, which checks `Content-Length` and also counts bytes while reading.
+- **Why:** `?manifest=` and `src` accept any URL, and an endless response would otherwise fill the tab's memory. The sample manifests are far smaller than the limit.
+- **Alternatives:** Trust `Content-Length`, which can be missing or false.
+- **Trade-offs:** A legitimate manifest over 5 MB is refused, with a clear message.

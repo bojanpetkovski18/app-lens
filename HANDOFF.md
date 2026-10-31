@@ -258,7 +258,6 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 
 - Generating the largest allowed manifest (15,000 records with 40 fields) takes about 1.4 seconds on the main thread. Typical manifests take a few milliseconds. A worker could remove the pause if real manifests get that large.
 - Repeat builds into the same folder leave old hashed assets behind, because `build` never deletes files.
-- Fetched manifests have no byte limit. The schema limits what gets rendered, not what gets downloaded.
 - `app-lens:resize` posts to `'*'` on purpose: the viewer can't know its embedder, and the message only carries a height.
 - Validation runs in two stages. If the schema stage fails, reference checks (unknown refs, personas) are only reported after those errors are fixed.
 - The on-screen demo is a rendered animation. "Download video" records a separate canvas render to WebM in real time, so it takes as long as the demo. MP4 is not produced.

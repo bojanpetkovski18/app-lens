@@ -50,6 +50,7 @@ Zod runs without its JIT, so its startup test for `eval` never trips a strict po
 
 `AppLensView` is the shared entry point. It takes a parsed manifest, and `stateKey` keeps the tab while the manifest changes, which Studio's preview relies on.
 
+- `fetchManifest` loads manifests from URLs without cookies, and stops reading at 5 MB even if the server misreports the size.
 - CSS classes start with `al-` and are scoped under `.al-root`.
 - The embed shares one stylesheet between instances. It waits for inline JSON and aborts in-flight fetches.
 - `onEvent`, the `app-lens:event` DOM event and iframe `postMessage` all carry the same analytics events.

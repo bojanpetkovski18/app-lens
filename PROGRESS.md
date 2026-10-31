@@ -15,6 +15,7 @@ Last updated: 2026-10-31.
 | Docs and AI-assistance note | `#0008-docs-and-ai-assistance-note` | In review |
 | CI pinning, secret scan and lint | `#0009-ci-pinning-secret-scan-and-lint` | In review |
 | Polish audit and fixes | `#0010-polish-audit-and-fixes` | In review |
+| Limit fetched manifests | `#0011-limit-fetched-manifest-size` | In review |
 
 ## Measured results
 
@@ -37,7 +38,7 @@ Last updated: 2026-10-31.
 - [x] Pinned CI actions and exact dependency versions
 - [x] Linting and an editor config
 - [x] Polish audit in `docs/AUDIT.md`
-- [ ] Byte limit on fetched manifests
+- [x] Byte limit on fetched manifests
 - [ ] Version set for the release
 
 ## Known issues

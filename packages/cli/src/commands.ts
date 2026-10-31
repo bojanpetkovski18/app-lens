@@ -1,10 +1,11 @@
 import { manifestJsonSchema, parseManifest, type Manifest } from '@app-lens/core';
 import { createHash } from 'node:crypto';
 import { cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { starterManifest } from './template';
 
 export class CliError extends Error {}
@@ -24,11 +25,33 @@ const MIME_TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
+// Inline styles are needed for runtime theming. Scripts only ever come from the site itself.
+const CONTENT_SECURITY_POLICY = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'";
+
 interface Options {
   out?: string;
   force?: boolean;
   name?: string;
   port?: string;
+}
+
+export function parseCliArgs(args: string[]) {
+  try {
+    return parseArgs({
+      args,
+      allowPositionals: true,
+      options: {
+        out: { type: 'string', short: 'o' },
+        force: { type: 'boolean', short: 'f' },
+        name: { type: 'string' },
+        port: { type: 'string', short: 'p' },
+        help: { type: 'boolean', short: 'h' },
+        version: { type: 'boolean', short: 'v' },
+      },
+    });
+  } catch (error) {
+    throw new CliError(`${(error as Error).message} Run "app-lens --help".`);
+  }
 }
 
 function assetRoot(): string {
@@ -37,6 +60,7 @@ function assetRoot(): string {
 
 function readManifestFile(file: string): unknown {
   if (!existsSync(file)) throw new CliError(`File not found: ${file}`);
+  if (statSync(file).isDirectory()) throw new CliError(`${file} is a folder. Pass a manifest file.`);
   const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
   try {
     return JSON.parse(text);
@@ -54,6 +78,7 @@ export function init(file = 'app-lens.json', options: Options = {}): void {
   const manifest = starterManifest(options.name ?? 'My App');
   const result = parseManifest(manifest);
   if (!result.ok) throw new Error(`Starter manifest is invalid: ${JSON.stringify(result.issues)}`);
+  mkdirSync(dirname(file), { recursive: true });
   writeJson(file, manifest);
   writeJson(join(dirname(file), 'app-lens.schema.json'), manifestJsonSchema());
   console.log(`Created ${file} and app-lens.schema.json.\n\nNext steps:\n  app-lens validate ${file}\n  app-lens preview ${file}`);
@@ -90,7 +115,11 @@ export function escapeHtml(value: string): string {
 
 /** Uses a function replacer so "$&" in a name stays literal. */
 export function pinManifest(html: string, appName: string): string {
-  const head = `<title>${escapeHtml(appName)} · AppLens</title>\n    <meta name="app-lens-manifest" content="manifest.json" />`;
+  const head = [
+    `<title>${escapeHtml(appName)} · AppLens</title>`,
+    `<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}" />`,
+    '<meta name="app-lens-manifest" content="manifest.json" />',
+  ].join('\n    ');
   return html.replace(/<title>[\s\S]*?<\/title>/, () => head);
 }
 
@@ -146,6 +175,43 @@ export function resolveStaticPath(root: string, urlPath: string): string | null 
   return candidate === base || candidate.startsWith(base + sep) ? candidate : null;
 }
 
+/** A page on another site can point its own DNS name at 127.0.0.1, so the Host header is checked. */
+export function isAllowedHost(host: string | undefined): boolean {
+  return /^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(host ?? '');
+}
+
+export function serveStatic(root: string, port: number): Promise<Server> {
+  const server = createServer((request, response) => {
+    if (!isAllowedHost(request.headers.host)) {
+      response.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+      response.end('Forbidden');
+      return;
+    }
+    let file = resolveStaticPath(root, request.url ?? '/');
+    if (file && existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+    if (!file || !existsSync(file)) {
+      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      response.end('Not found');
+      return;
+    }
+    response.writeHead(200, {
+      'Content-Type': MIME_TYPES[extname(file)] ?? 'application/octet-stream',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    createReadStream(file)
+      .on('error', () => response.destroy())
+      .pipe(response);
+  });
+
+  return new Promise((resolvePromise, reject) => {
+    server.once('error', (error: NodeJS.ErrnoException) => {
+      reject(error.code === 'EADDRINUSE' ? new CliError(`Port ${port} is already in use. Pick another with --port.`) : error);
+    });
+    server.listen(port, '127.0.0.1', () => resolvePromise(server));
+  });
+}
+
 export async function preview(target: string, options: Options = {}): Promise<void> {
   const port = options.port === undefined ? DEFAULT_PORT : Number(options.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new CliError(`Invalid port "${options.port}".`);
@@ -159,26 +225,7 @@ export async function preview(target: string, options: Options = {}): Promise<vo
   }
   if (!existsSync(join(root, 'index.html'))) throw new CliError(`${root} has no index.html.`);
 
-  const server = createServer((request, response) => {
-    let file = resolveStaticPath(root, request.url ?? '/');
-    if (file && existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
-    if (!file || !existsSync(file)) {
-      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      response.end('Not found');
-      return;
-    }
-    response.writeHead(200, {
-      'Content-Type': MIME_TYPES[extname(file)] ?? 'application/octet-stream',
-      'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff',
-    });
-    createReadStream(file).pipe(response);
-  });
-
-  await new Promise<void>((resolvePromise, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', resolvePromise);
-  });
+  await serveStatic(root, port);
   const url = `http://127.0.0.1:${port}/`;
   console.log(`Previewing ${basename(resolve(target))}:\n  ${url}\n  ${url}?embed=1&theme=dark   (iframe mode)\n\nPress Ctrl+C to stop.`);
 }

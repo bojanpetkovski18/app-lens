@@ -3,15 +3,33 @@
   "version": "0.2.0",
   "private": true,
   "description": "Manifest-driven, interactive showcase of what an application does, powered by generated mock data.",
-  "workspaces": ["packages/core", "packages/ui", "packages/embed", "apps/viewer", "packages/cli"],
+  "workspaces": [
+    "packages/core",
+    "packages/ui",
+    "packages/embed",
+    "apps/viewer",
+    "packages/cli"
+  ],
   "scripts": {
     "dev": "npm run dev -w @app-lens/viewer",
     "dev:embed": "npm run dev -w @app-lens/embed",
     "build": "npm run build -w @app-lens/viewer && npm run build -w @app-lens/embed && npm run build -w @app-lens/cli",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "app-lens": "node packages/cli/dist/cli.js"
+    "app-lens": "node packages/cli/dist/cli.js",
+    "e2e": "playwright test",
+    "measure": "node scripts/measure.mjs"
   },
-  "devDependencies": { "@types/node": "^18.19.64", "typescript": "^5.6.3" },
-  "overrides": { "vite": "^6.4.5" }
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "vite": "^6.4.5"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
 }

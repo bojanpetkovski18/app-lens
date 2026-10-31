@@ -20,6 +20,11 @@ export class ReferenceCycleError extends Error {
   }
 }
 
+/** Manifest names are untrusted, and "constructor" must not find Object.prototype.constructor. */
+export function ownValue<T>(record: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(record, key) ? record[key] : undefined;
+}
+
 export type ParsedField = [name: string, spec: FieldSpec];
 const parsedFields = new WeakMap<EntityDefinition, ParsedField[]>();
 
@@ -56,7 +61,7 @@ export function entityOrder(entities: Manifest['entities']): string[] {
     state.set(name, 'visiting');
     const entity = entities[name];
     for (const [, spec] of entity ? getEntityFields(entity) : []) {
-      if (spec.kind === 'ref' && spec.target && spec.target !== name && entities[spec.target]) {
+      if (spec.kind === 'ref' && spec.target && spec.target !== name && ownValue(entities, spec.target)) {
         visit(spec.target, [...path, name]);
       }
     }
@@ -76,12 +81,12 @@ export function createRecord(
   sequence: number,
   baseDate: Date,
 ): MockRecord {
-  const entity = manifest.entities[entityName];
+  const entity = ownValue(manifest.entities, entityName);
   if (!entity) throw new Error(`Unknown entity "${entityName}".`);
   const record: MockRecord = { id: `${entityName.toLowerCase()}-${String(sequence).padStart(3, '0')}` };
   const hints: RecordHints = {};
   const pickRef = (target: string): string | null => {
-    const pool = dataset[target];
+    const pool = ownValue(dataset, target);
     return pool && pool.length > 0 ? rng.pick(pool).id : null;
   };
   for (const [name, spec] of getEntityFields(entity)) {

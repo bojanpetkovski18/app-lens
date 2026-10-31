@@ -1,3 +1,4 @@
+import { parseManifest } from '@app-lens/core';
 import { AppLensView, Frame, sanitizeTheme, TABS, type Tab } from '@app-lens/ui';
 import styles from '@app-lens/ui/styles.css?inline';
 import { createRoot, type Root } from 'react-dom/client';
@@ -5,6 +6,24 @@ import { createRoot, type Root } from 'react-dom/client';
 type State = { status: 'loading' } | { status: 'ready' } | { status: 'error'; message: string };
 
 const HOST_STYLES = ':host { display: block; } :host([hidden]) { display: none; }';
+const INLINE_MANIFEST = 'script[type="application/json"]';
+
+// One stylesheet shared by every instance on the page.
+let sharedSheet: CSSStyleSheet | undefined;
+
+function applyStyles(shadow: ShadowRoot): void {
+  if ('replaceSync' in CSSStyleSheet.prototype && 'adoptedStyleSheets' in Document.prototype) {
+    if (!sharedSheet) {
+      sharedSheet = new CSSStyleSheet();
+      sharedSheet.replaceSync(styles + HOST_STYLES);
+    }
+    shadow.adoptedStyleSheets = [sharedSheet];
+    return;
+  }
+  const style = document.createElement('style');
+  style.textContent = styles + HOST_STYLES;
+  shadow.prepend(style);
+}
 
 class AppLensElement extends HTMLElement {
   static observedAttributes = ['src', 'theme', 'primary', 'accent', 'radius', 'font', 'tab', 'persona'];
@@ -13,17 +32,16 @@ class AppLensElement extends HTMLElement {
   #manifest: unknown = undefined;
   #state: State = { status: 'loading' };
   #request = 0;
+  #abort: AbortController | null = null;
+  #observer: MutationObserver | null = null;
 
   get manifest(): unknown {
     return this.#manifest;
   }
 
   set manifest(value: unknown) {
-    this.#request++;
-    this.#manifest = value;
-    this.#state = { status: 'ready' };
-    this.#render();
-    this.#emit('app-lens:ready');
+    this.#cancelLoad();
+    this.#apply(value);
   }
 
   connectedCallback(): void {
@@ -36,10 +54,9 @@ class AppLensElement extends HTMLElement {
 
     if (!this.#root) {
       const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
-      const style = document.createElement('style');
-      style.textContent = styles + HOST_STYLES;
       const mount = document.createElement('div');
-      shadow.replaceChildren(style, mount);
+      shadow.replaceChildren(mount);
+      applyStyles(shadow);
       this.#root = createRoot(mount);
     }
 
@@ -51,6 +68,7 @@ class AppLensElement extends HTMLElement {
     // Unmount in a microtask so moving the element within the page does not tear it down.
     queueMicrotask(() => {
       if (this.isConnected) return;
+      this.#cancelLoad();
       this.#root?.unmount();
       this.#root = null;
     });
@@ -62,34 +80,63 @@ class AppLensElement extends HTMLElement {
     else this.#render();
   }
 
-  async #load(): Promise<void> {
-    const request = ++this.#request;
-    const inline = this.querySelector('script[type="application/json"]');
+  #cancelLoad(): void {
+    this.#request++;
+    this.#abort?.abort();
+    this.#abort = null;
+    this.#observer?.disconnect();
+    this.#observer = null;
+  }
+
+  /** While the page is parsing, this element can exist before its children do. */
+  #waitForMarkup(): void {
+    if (!this.#observer) {
+      this.#observer = new MutationObserver(() => void this.#load());
+      this.#observer.observe(this, { childList: true, subtree: true, characterData: true });
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => void this.#load(), { once: true });
+    }
+  }
+
+  #parseInline(inline: Element): { value: unknown } | null {
     try {
-      if (inline) {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(inline.textContent ?? '');
-        } catch {
-          throw new Error('The inline manifest is not valid JSON.');
-        }
-        this.#finish(request, parsed);
+      return { value: JSON.parse(inline.textContent ?? '') };
+    } catch {
+      // The parser may have delivered only part of the script so far.
+      if (document.readyState === 'loading') return null;
+      throw new Error('The inline manifest is not valid JSON.');
+    }
+  }
+
+  async #load(): Promise<void> {
+    if (this.#manifest !== undefined && !this.hasAttribute('src')) return;
+    this.#cancelLoad();
+    const request = this.#request;
+    try {
+      const inline = this.querySelector(INLINE_MANIFEST);
+      const parsed = inline ? this.#parseInline(inline) : null;
+      if (parsed) {
+        this.#apply(parsed.value);
         return;
       }
       const src = this.getAttribute('src');
       if (!src) {
         this.#state = { status: 'loading' };
         this.#render();
+        this.#waitForMarkup();
         return;
       }
       const url = new URL(src, document.baseURI);
       if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Only http(s) manifest URLs are allowed.');
       this.#state = { status: 'loading' };
       this.#render();
-      const response = await fetch(url.href, { credentials: 'omit' });
+      const controller = new AbortController();
+      this.#abort = controller;
+      const response = await fetch(url.href, { credentials: 'omit', signal: controller.signal });
       if (!response.ok) throw new Error(`Could not load manifest (HTTP ${response.status}).`);
       const manifest: unknown = await response.json();
-      this.#finish(request, manifest);
+      if (request === this.#request) this.#apply(manifest);
     } catch (error) {
       if (request !== this.#request) return;
       const message = error instanceof Error ? error.message : String(error);
@@ -99,12 +146,16 @@ class AppLensElement extends HTMLElement {
     }
   }
 
-  #finish(request: number, manifest: unknown): void {
-    if (request !== this.#request) return;
+  #apply(manifest: unknown): void {
     this.#manifest = manifest;
     this.#state = { status: 'ready' };
     this.#render();
-    this.#emit('app-lens:ready');
+    const result = parseManifest(manifest);
+    if (result.ok) {
+      this.#emit('app-lens:ready');
+    } else {
+      this.#emit('app-lens:error', { message: `This manifest has ${result.issues.length} problem(s).`, issues: result.issues });
+    }
   }
 
   #emit(type: string, detail?: unknown): void {
@@ -125,9 +176,7 @@ class AppLensElement extends HTMLElement {
     const persona = this.getAttribute('persona') ?? undefined;
 
     if (this.#state.status === 'ready') {
-      this.#root.render(
-        <AppLensView key={`${tab}|${persona}`} manifest={this.#manifest} theme={theme} embedded initialTab={tab} initialPersona={persona} />,
-      );
+      this.#root.render(<AppLensView manifest={this.#manifest} theme={theme} embedded initialTab={tab} initialPersona={persona} />);
     } else {
       this.#root.render(
         <Frame overrides={theme} embedded>

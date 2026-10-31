@@ -3,3 +3,5 @@ dist/
 *.log
 .DS_Store
 *.local.md
+test-results/
+playwright-report/

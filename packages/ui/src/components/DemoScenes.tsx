@@ -73,7 +73,7 @@ function PersonasView({ scene, ms }: { scene: PersonasScene; ms: number }) {
             </div>
             {persona.description ? <p className="al-muted">{persona.description}</p> : null}
             <ul className="al-list">
-              {persona.goals.slice(0, 2).map((goal) => <li key={goal}>{goal}</li>)}
+              {persona.goals.slice(0, 2).map((goal, index) => <li key={index}>{goal}</li>)}
             </ul>
           </div>
         ))}
@@ -96,7 +96,7 @@ function FeatureView({ manifest, scene, ms }: { manifest: Manifest; scene: Featu
         {feature.description ? <p className={`al-scene-sub ${reveal(ms, 600)}`}>{feature.description}</p> : null}
         <ul className="al-list">
           {feature.highlights.map((highlight, index) => (
-            <li key={highlight} className={reveal(ms, 1000 + index * 700)}>{highlight}</li>
+            <li key={index} className={reveal(ms, 1000 + index * 700)}>{highlight}</li>
           ))}
         </ul>
       </div>
@@ -203,7 +203,7 @@ function OutroView({ scene, ms }: { scene: OutroScene; ms: number }) {
         ))}
       </div>
       <div className={`al-tags ${reveal(ms, 1800)}`}>
-        {scene.integrations.map((name) => <span key={name} className="al-tag">{name}</span>)}
+        {scene.integrations.map((name, index) => <span key={index} className="al-tag">{name}</span>)}
       </div>
       <p className={`al-scene-sub ${reveal(ms, 2400)}`}>{scene.caption}</p>
     </div>

@@ -5,7 +5,7 @@ This file records **everything that has been built and changed in AppLens so far
 - [HANDOFF.md](HANDOFF.md) says **what to do next**: the GitHub workflow, the phase plan and the rules.
 - This file says **what already exists, how it was built, and how to rebuild it**.
 
-Last updated: 2026-10-30, after **Phase 2** and the handoff/clean-up session (see Part A).
+Last updated: 2026-10-30, after **Phase 3** (see Part A).
 
 ---
 
@@ -86,6 +86,17 @@ All of these were made in one working session, in this order:
    - HANDOFF.md: removed every reference to that manifest and `private/` (checks, layout, section 8 rules, security list, known issues). Phase 5 now writes third-party drafts to a gitignored `drafts/` folder, which that PR adds.
    - Verified afterwards: typecheck passes, 46 tests pass, build passes, and the build output has 0 matches for the removed manifest or `__app-lens/private`.
 6. **Created this file (REBUILD.md).**
+
+## A.4 Phase 3: Code review (done)
+
+The review started with a baseline, and each confirmed bug got a regression test that failed before its fix. Findings and before/after numbers are in PR #2. Changes to the behaviour described in Part B:
+
+- **Tooling:** Node 20.19+ (CI on 22), vitest 4.1, `@types/node` 22, esbuild target `node20`, GitHub Actions CI, Playwright e2e in `e2e/`, `scripts/measure.mjs`, UI and embed unit tests with jsdom.
+- **Core:** `isoDate` rejects dates that don't exist. Date offsets are limited to ±100000 days and numbers to the safe integer range. `ownValue` replaces direct lookups of untrusted names. Scenario values are checked against the field kind. Upper-case http schemes are accepted, and generated numbers are never `-0`.
+- **UI:** `Showcase` is keyed by manifest and follows `initialTab` and `initialPersona` after mount. Tabs have a roving tabindex, arrow keys and a linked tabpanel. The data explorer paginates at 50 rows, opens rows from the keyboard and clears the search when the data type changes. Ref lookups use `recordIndex`, Intl formatters are cached, and `matchMedia` is optional. The demo clock steps at most 250 ms per frame, starts paused with reduced motion and finds fullscreen through `getRootNode()`.
+- **Viewer:** the pinned manifest wins over `?manifest=`, invalid URLs and invalid JSON show errors, and fetches use `AbortController`.
+- **Embed:** waits for inline JSON that isn't parsed yet, shares one constructable stylesheet, aborts stale fetches, has no `key` on `AppLensView`, and fires `app-lens:error` for invalid manifests.
+- **CLI:** `parseCliArgs` and `serveStatic` are exported. Bad flags, folders and busy ports are `CliError`s. `init` creates parent folders. Built sites get a CSP meta tag, and the server checks `Host`.
 
 ---
 
@@ -881,7 +892,7 @@ Run these from the repo root. All must pass before PR #1 is opened (HANDOFF sect
 ```bash
 npm install
 npm run typecheck      # every package, 0 errors
-npm test               # 48 tests: 35 core + 13 CLI
+npm test               # 124 tests: 61 core, 27 CLI, 22 UI, 11 embed, 3 viewer
 npm run build          # viewer -> embed -> cli; Rollup may print zod annotation warnings, which are harmless
 npm run app-lens -- --help
 npm run app-lens -- validate samples/invoiceflow.app-lens.json

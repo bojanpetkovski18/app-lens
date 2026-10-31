@@ -1,5 +1,4 @@
-import { parseArgs } from 'node:util';
-import { build, CliError, init, preview, schema, validate } from './commands';
+import { build, CliError, init, parseCliArgs, preview, schema, validate } from './commands';
 
 const VERSION = '0.2.0';
 
@@ -18,17 +17,7 @@ Options
 `;
 
 async function main(): Promise<void> {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    options: {
-      out: { type: 'string', short: 'o' },
-      force: { type: 'boolean', short: 'f' },
-      name: { type: 'string' },
-      port: { type: 'string', short: 'p' },
-      help: { type: 'boolean', short: 'h' },
-      version: { type: 'boolean', short: 'v' },
-    },
-  });
+  const { values, positionals } = parseCliArgs(process.argv.slice(2));
   const [command, target] = positionals;
 
   if (values.version) {

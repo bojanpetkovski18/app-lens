@@ -1,7 +1,7 @@
 import { AppLensView, Frame, sanitizeTheme, TABS, type Tab } from '@app-lens/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { SourcePicker } from './components/SourcePicker';
-import { pinnedManifestUrl, sampleSources, sourceFromUrl, type ManifestSource } from './sources';
+import { pinnedManifestUrl, resolveManifestUrl, sampleSources, sourceFromUrl, type ManifestSource } from './sources';
 
 const params = new URLSearchParams(window.location.search);
 const embedded = ['1', 'true'].includes(params.get('embed') ?? '');
@@ -16,39 +16,42 @@ const themeOverrides = sanitizeTheme({
   font: params.get('font'),
 });
 
-function resolveSources(): { sources: ManifestSource[]; pinned: boolean } {
-  const url = params.get('manifest') ?? pinnedManifestUrl();
-  const source = url ? sourceFromUrl(url) : null;
-  return source ? { sources: [source], pinned: true } : { sources: sampleSources(), pinned: false };
+function resolveSources(): { sources: ManifestSource[]; pinned: boolean; invalidUrl?: string } {
+  const url = resolveManifestUrl(params.get('manifest'), pinnedManifestUrl());
+  if (!url) return { sources: sampleSources(), pinned: false };
+  const source = sourceFromUrl(url);
+  return source ? { sources: [source], pinned: true } : { sources: [], pinned: true, invalidUrl: url };
 }
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; manifest: unknown };
 
 export function App() {
-  const { sources, pinned } = useMemo(resolveSources, []);
-  const [activeKey, setActiveKey] = useState(() => params.get('source') ?? sources[0]?.key ?? '');
+  const { sources, pinned, invalidUrl } = useMemo(resolveSources, []);
+  const [activeKey, setActiveKey] = useState(() => (pinned ? sources[0]?.key : params.get('source') ?? sources[0]?.key) ?? '');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
   useEffect(() => {
+    if (invalidUrl) {
+      setState({ status: 'error', message: `Only http(s) manifest URLs are allowed: ${invalidUrl}` });
+      return;
+    }
     const source = sources.find((item) => item.key === activeKey);
     if (!source) {
       setState(activeKey ? { status: 'error', message: `Unknown manifest source "${activeKey}".` } : { status: 'loading' });
       return;
     }
-    let active = true;
+    const controller = new AbortController();
     setState({ status: 'loading' });
-    source.load().then(
+    source.load(controller.signal).then(
       (manifest) => {
-        if (active) setState({ status: 'ready', manifest });
+        if (!controller.signal.aborted) setState({ status: 'ready', manifest });
       },
       (error: unknown) => {
-        if (active) setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
+        if (!controller.signal.aborted) setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
       },
     );
-    return () => {
-      active = false;
-    };
-  }, [activeKey, sources]);
+    return () => controller.abort();
+  }, [activeKey, sources, invalidUrl]);
 
   useEffect(() => {
     if (!embedded || window.parent === window) return;

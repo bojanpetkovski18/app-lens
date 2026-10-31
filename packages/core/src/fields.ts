@@ -30,6 +30,8 @@ export type ParseFieldResult = { ok: true; spec: FieldSpec } | { ok: false; erro
 
 export const DAY_MS = 86_400_000;
 const MAX_COUNT = 50;
+/** Far enough for any demo, close enough that dates stay valid and four-digit years. */
+const MAX_DATE_OFFSET_DAYS = 100_000;
 
 const DEFAULT_RANGES: Partial<Record<FieldKind, FieldRange>> = {
   int: { min: 0, max: 100 },
@@ -45,6 +47,7 @@ const DEFAULT_RANGES: Partial<Record<FieldKind, FieldRange>> = {
 
 const WHOLE_NUMBER_KINDS: ReadonlySet<FieldKind> = new Set(['int', 'percent', 'date', 'words', 'sentence', 'paragraph']);
 const COUNT_KINDS: ReadonlySet<FieldKind> = new Set(['words', 'sentence', 'paragraph']);
+const DATE_KINDS: ReadonlySet<FieldKind> = new Set(['date', 'datetime']);
 
 const RANGE = /^(-?\d+(?:\.\d+)?)\.\.(-?\d+(?:\.\d+)?)$/;
 const SINGLE_NUMBER = /^-?\d+(?:\.\d+)?$/;
@@ -95,6 +98,11 @@ export function parseFieldSpec(raw: string): ParseFieldResult {
   const range = parseRange(arg);
   if (!range) return { ok: false, error: `Invalid range "${arg}" for "${kind}". Use "min..max", e.g. "${kind}:1..10".` };
   if (range.min > range.max) return { ok: false, error: `Range minimum is greater than maximum in "${raw}".` };
+  const largest = Math.max(Math.abs(range.min), Math.abs(range.max));
+  if (largest > Number.MAX_SAFE_INTEGER) return { ok: false, error: `Range in "${raw}" is too large.` };
+  if (DATE_KINDS.has(kind) && largest > MAX_DATE_OFFSET_DAYS) {
+    return { ok: false, error: `"${kind}" offsets must be within ${MAX_DATE_OFFSET_DAYS} days of the base date.` };
+  }
   if (WHOLE_NUMBER_KINDS.has(kind) && !(Number.isInteger(range.min) && Number.isInteger(range.max))) {
     return { ok: false, error: `"${kind}" needs a whole-number range, e.g. "${kind}:1..10".` };
   }
@@ -168,7 +176,8 @@ function email(ctx: GenerateContext): string {
 }
 
 function rounded(value: number): number {
-  return Math.round(value * 100) / 100;
+  // Adding zero turns -0 into 0.
+  return Math.round(value * 100) / 100 + 0;
 }
 
 export function generateValue(spec: FieldSpec, ctx: GenerateContext): Scalar {

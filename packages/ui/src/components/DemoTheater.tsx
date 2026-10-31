@@ -1,6 +1,6 @@
 import { buildDemo, sceneAt, type Dataset, type DemoScript, type Manifest } from '@app-lens/core';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { initials, slug } from '../util';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { initials, mediaMatches, slug } from '../util';
 import { DemoStage, sceneCaption } from './DemoScenes';
 
 interface DemoTheaterProps {
@@ -15,6 +15,8 @@ type Phase = 'idle' | 'researching' | 'ready';
 const STAGE_MS = 950;
 const REDUCED_STAGE_MS = 250;
 const SEEK_STEP_MS = 5000;
+/** Longest step of the video clock, so returning to a background tab does not skip ahead. */
+const MAX_FRAME_MS = 250;
 
 // A demo already researched for a manifest, persona and seed skips the research step this session.
 const researched = new WeakMap<Manifest, Set<string>>();
@@ -78,8 +80,7 @@ function Research({ stages, onDone }: { stages: { label: string; detail: string 
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const delay = reduced ? REDUCED_STAGE_MS : STAGE_MS;
+    const delay = mediaMatches('(prefers-reduced-motion: reduce)') ? REDUCED_STAGE_MS : STAGE_MS;
     if (current >= stages.length) {
       onDone();
       return;
@@ -110,6 +111,25 @@ function Research({ stages, onDone }: { stages: { label: string; detail: string 
   );
 }
 
+interface ChapterListProps {
+  chapters: { id: string; title: string; start: number }[];
+  current: number;
+  onSeek: (ms: number) => void;
+}
+
+// Memoised because the player re-renders on every animation frame.
+const ChapterList = memo(function ChapterList({ chapters, current, onSeek }: ChapterListProps) {
+  return (
+    <div className="al-chips">
+      {chapters.map((chapter, index) => (
+        <button key={chapter.id} type="button" className="al-chip" aria-pressed={index === current} onClick={() => onSeek(chapter.start)}>
+          {chapter.title}
+        </button>
+      ))}
+    </div>
+  );
+});
+
 interface DemoVideoProps {
   manifest: Manifest;
   script: DemoScript;
@@ -118,7 +138,7 @@ interface DemoVideoProps {
 
 function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
   const [elapsed, setElapsed] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(() => !mediaMatches('(prefers-reduced-motion: reduce)'));
   const [fullscreen, setFullscreen] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
 
@@ -127,7 +147,7 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
     let frame = 0;
     let previous = performance.now();
     const tick = (now: number) => {
-      const delta = now - previous;
+      const delta = Math.min(MAX_FRAME_MS, now - previous);
       previous = now;
       setElapsed((value) => Math.min(script.durationMs, value + delta));
       frame = requestAnimationFrame(tick);
@@ -141,7 +161,11 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
   }, [elapsed, script.durationMs]);
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === rootRef.current);
+    // Inside a shadow root, document.fullscreenElement is the host, not the player.
+    const onChange = () => {
+      const root = rootRef.current;
+      setFullscreen(!!root && (root.getRootNode() as unknown as DocumentOrShadowRoot).fullscreenElement === root);
+    };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
@@ -149,7 +173,10 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
   const position = sceneAt(script, elapsed);
   const ended = elapsed >= script.durationMs;
 
-  const seek = (value: number) => setElapsed(Math.max(0, Math.min(script.durationMs, value)));
+  const seek = useCallback(
+    (value: number) => setElapsed(Math.max(0, Math.min(script.durationMs, value))),
+    [script.durationMs],
+  );
   const toggle = () => {
     if (ended) setElapsed(0);
     setPlaying(!playing || ended);
@@ -162,6 +189,7 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     if (target.tagName === 'INPUT') return;
+    if (event.key === ' ' && target.tagName === 'BUTTON') return;
     if (event.key === ' ' || event.key === 'k') {
       event.preventDefault();
       toggle();
@@ -226,13 +254,7 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
         </div>
       </section>
       <div className="al-toolbar">
-        <div className="al-chips">
-          {chapters.map((chapter, index) => (
-            <button key={chapter.id} type="button" className="al-chip" aria-pressed={index === position.index} onClick={() => seek(chapter.start)}>
-              {chapter.title}
-            </button>
-          ))}
-        </div>
+        <ChapterList chapters={chapters} current={position.index} onSeek={seek} />
         <button type="button" className="al-link" onClick={onResearchAgain}>Research again</button>
       </div>
     </div>

@@ -10,7 +10,7 @@ Use the result as a standalone site, inside an iframe, as an `<app-lens>` web co
 
 ## Quick start
 
-Requires Node 22 LTS and npm 10 or later.
+Requires Node 20.19 or later (22 LTS recommended) and npm 10 or later.
 
 ```bash
 npm install

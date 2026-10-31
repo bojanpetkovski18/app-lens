@@ -1,6 +1,6 @@
 import { displayOf, type Dataset, type FieldSpec, type Manifest, type Scalar } from '@app-lens/core';
 import type { CSSProperties } from 'react';
-import { formatDate, formatMoney, hue } from '../util';
+import { formatDate, formatMoney, hue, recordIndex } from '../util';
 
 export function Badge({ value }: { value: string }) {
   return <span className="al-badge" style={{ '--al-hue': hue(value) } as CSSProperties}>{value}</span>;
@@ -20,7 +20,7 @@ export function FieldValue({ value, spec, manifest, dataset, onOpenRef }: FieldV
   switch (spec?.kind) {
     case 'ref': {
       const target = spec.target ?? '';
-      const record = dataset[target]?.find((candidate) => candidate.id === value);
+      const record = recordIndex(dataset[target] ?? []).get(String(value));
       const label = record ? displayOf(manifest, target, record) : String(value);
       return record && onOpenRef ? (
         <button

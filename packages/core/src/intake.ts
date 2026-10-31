@@ -116,26 +116,29 @@ export function toId(value: string): string {
   return id;
 }
 
+// Matched against snake_case, so a whole word is needed: "update" is not a date, "votes" are not notes.
 const NAME_KINDS: [RegExp, string][] = [
-  [/^(full_?)?name$|^display_?name$|^contact$/i, 'fullName'],
-  [/^first_?name$/i, 'firstName'],
-  [/^last_?name$|^surname$/i, 'lastName'],
-  [/e_?mail/i, 'email'],
-  [/phone|mobile/i, 'phone'],
-  [/company|organi[sz]ation|^org$/i, 'company'],
-  [/^(job_?)?title$|^position$/i, 'title'],
-  [/^city$/i, 'city'],
-  [/^country$/i, 'country'],
-  [/description|summary|bio|notes?$|comment|content|^body$/i, 'sentence'],
-  [/price|amount|total|cost|salary|balance|(^|_)fee(s)?$|Fees?$/i, 'money'],
-  [/percent|progress|(^|_)rate$|Rate$/, 'percent'],
-  [/^(created|updated|deleted|published)(_?at)?$|_at$|At$/, 'datetime'],
-  [/date$|^due$|^(start|end)(_?(on|at|day))?$/i, 'date'],
+  [/^(full_)?name$|^display_name$|^contact$/, 'fullName'],
+  [/^first_name$/, 'firstName'],
+  [/^last_name$|^surname$/, 'lastName'],
+  [/(^|_)e_?mail(_|$)/, 'email'],
+  [/(^|_)(phone|mobile|telephone)(_|$)/, 'phone'],
+  [/(^|_)(company|organi[sz]ation|org)(_|$)/, 'company'],
+  [/^job_title$/, 'jobTitle'],
+  [/^title$|^position$/, 'title'],
+  [/^city$/, 'city'],
+  [/^country$/, 'country'],
+  [/(^|_)(description|summary|bio|notes?|comments?|content|body)$/, 'sentence'],
+  [/(^|_)(price|amount|total|cost|salary|balance|fees?)$/, 'money'],
+  [/(^|_)(percent|percentage|progress|rate)$/, 'percent'],
+  [/^(created|updated|deleted|published)(_at)?$|_at$/, 'datetime'],
+  [/(^|_)date$|^due$|^(start|end)(_(on|day))?$/, 'date'],
 ];
 
 /** Picks a generator from a field's name, falling back to the given kind. */
 export function kindForName(name: string, fallback: string): string {
-  return NAME_KINDS.find(([pattern]) => pattern.test(name))?.[1] ?? fallback;
+  const snake = name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return NAME_KINDS.find(([pattern]) => pattern.test(snake))?.[1] ?? fallback;
 }
 
 const ENTITY_LIMIT = 30;
@@ -146,6 +149,11 @@ const SCENARIO_LIMIT = 5;
 const LIST_LIMIT = 10;
 const DEFAULT_COUNT = 12;
 const STATUS_FIELD = /^(status|state|stage|phase)$/i;
+/** Same limits as the schema, so a draft is cut to fit instead of failing validation. */
+const MAX_NAME = 60;
+const MAX_SPEC = 300;
+const MAX_TITLE = 80;
+const MAX_SOURCE = 500;
 
 function clip(value: string | undefined, max: number): string | undefined {
   const text = value?.replace(/\s+/g, ' ').trim();
@@ -180,9 +188,33 @@ export interface DraftResult {
 
 function uniqueName(base: string, taken: Set<string>): string {
   let name = base;
-  for (let suffix = 2; taken.has(name); suffix++) name = `${base.slice(0, 58)}${suffix}`;
+  for (let suffix = 2; taken.has(name); suffix++) name = `${base.slice(0, MAX_NAME - String(suffix).length)}${suffix}`;
   taken.add(name);
   return name;
+}
+
+function isHttpUrl(value: string): boolean {
+  if (!/^https?:\/\//i.test(value)) return false;
+  try {
+    return Boolean(new URL(value).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Long enums are common, for example a list of countries. Only the first options fit in a spec. */
+function fitSpec(spec: string, path: string, notes: string[]): string {
+  if (spec.length <= MAX_SPEC) return spec;
+  if (!spec.startsWith('enum:')) return 'word';
+  const options = spec.slice(5).split(',');
+  const kept: string[] = [];
+  for (const option of options) {
+    if (`enum:${[...kept, option].join(',')}`.length > MAX_SPEC) break;
+    kept.push(option);
+  }
+  if (kept.length === 0) return 'word';
+  notes.push(`${path}: kept the first ${kept.length} of ${options.length} options.`);
+  return `enum:${kept.join(',')}`;
 }
 
 function cleanEntities(signals: ProjectSignals, notes: string[]) {
@@ -209,13 +241,13 @@ function cleanEntities(signals: ProjectSignals, notes: string[]) {
     for (const [rawField, rawSpec] of Object.entries(signal.fields)) {
       let field = toFieldName(rawField);
       if (field === 'id') field = `${toFieldName(signal.name)}Id`.slice(0, 60);
-      if (!field || field in fields || Object.keys(fields).length >= FIELD_LIMIT) continue;
+      if (!field || Object.hasOwn(fields, field) || Object.keys(fields).length >= FIELD_LIMIT) continue;
       const spec = rawSpec.startsWith('ref:') ? resolveRef(rawSpec, renamed) : rawSpec;
       if (!spec) {
         notes.push(`${name}.${field}: replaced a link to an entity that was not found.`);
         fields[field] = 'codename';
       } else {
-        fields[field] = parseFieldSpec(spec).ok ? spec : 'word';
+        fields[field] = parseFieldSpec(spec).ok ? fitSpec(spec, `${name}.${field}`, notes) : 'word';
       }
     }
     if (Object.keys(fields).length === 0) fields.name = 'title';
@@ -260,9 +292,10 @@ function statusFlow(entities: Record<string, { fields: Record<string, string> }>
 }
 
 function draftScenarios(entities: Record<string, { fields: Record<string, string> }>) {
+  const ids = new Set<string>();
   return statusFlow(entities).slice(0, SCENARIO_LIMIT).map(({ name, field, options }) => ({
-    id: toId(`${name} lifecycle`),
-    title: `Follow a ${words(name).join(' ').toLowerCase()} from start to finish`,
+    id: uniqueName(toId(`${name} lifecycle`), ids),
+    title: clip(`Follow a ${words(name).join(' ').toLowerCase()} from start to finish`, MAX_TITLE) as string,
     entity: name,
     steps: [
       { action: 'create' as const, narration: `A new ${words(name).join(' ').toLowerCase()} starts as ${options[0]}.`, values: { [field]: options[0] as string } },
@@ -320,7 +353,11 @@ export function draftManifest(signals: ProjectSignals, options: DraftOptions = {
     primary: signals.theme?.primary,
     accent: signals.theme?.accent,
   };
-  const website = signals.website && /^https?:\/\//i.test(signals.website) ? signals.website : undefined;
+  const website = signals.website && isHttpUrl(signals.website) ? signals.website : undefined;
+  const attribution = options.attribution && {
+    text: clip(options.attribution.text, MAX_SOURCE) as string,
+    ...(options.attribution.url && isHttpUrl(options.attribution.url) ? { url: options.attribution.url } : {}),
+  };
 
   const manifest: ManifestInput = {
     manifestVersion: 1,
@@ -333,7 +370,7 @@ export function draftManifest(signals: ProjectSignals, options: DraftOptions = {
       website,
       ...(theme.primary || theme.accent ? { theme: { ...(theme.primary ? { primary: theme.primary } : {}), ...(theme.accent ? { accent: theme.accent } : {}) } } : {}),
     },
-    ...(options.attribution ? { attribution: options.attribution } : {}),
+    ...(attribution ? { attribution } : {}),
     personas,
     entities,
     features,
@@ -343,7 +380,7 @@ export function draftManifest(signals: ProjectSignals, options: DraftOptions = {
       return clipped ? [{ name: clipped }] : [];
     }),
     mock: { seed: toId(name) || 'app-lens' },
-    ...(options.thirdParty ? { draft: { thirdParty: true, source: options.thirdParty.source } } : {}),
+    ...(options.thirdParty ? { draft: { thirdParty: true, source: clip(options.thirdParty.source, MAX_SOURCE) as string } } : {}),
   };
 
   const clean = JSON.parse(JSON.stringify(manifest)) as ManifestInput;

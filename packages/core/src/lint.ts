@@ -54,7 +54,7 @@ export function lintManifest(manifest: Manifest): LintResult {
   }
 
   // Steps that find nothing play back as a walkthrough where nothing happens.
-  const dataset = generateDataset(manifest);
+  const dataset = scenarios.length > 0 ? generateDataset(manifest) : {};
   scenarios.forEach((scenario, index) => {
     runScenario(manifest, dataset, scenario).forEach((frame, step) => {
       const path = `scenarios[${index}].steps[${step}]`;
@@ -70,7 +70,7 @@ export function lintManifest(manifest: Manifest): LintResult {
 }
 
 export interface ManifestChange {
-  section: 'app' | 'personas' | 'entities' | 'features' | 'scenarios' | 'integrations';
+  section: 'app' | 'personas' | 'entities' | 'features' | 'scenarios' | 'integrations' | 'settings';
   type: 'added' | 'removed' | 'changed';
   name: string;
 }
@@ -92,6 +92,8 @@ function diffList<T>(section: ManifestChange['section'], before: T[], after: T[]
 /** What differs between two manifests. Used for review steps and release notes. */
 export function diffManifests(before: Manifest, after: Manifest): ManifestChange[] {
   const entries = (manifest: Manifest) => Object.entries(manifest.entities);
+  const setting = (name: string, read: (manifest: Manifest) => unknown): ManifestChange[] =>
+    JSON.stringify(read(before)) === JSON.stringify(read(after)) ? [] : [{ section: 'settings', type: 'changed', name }];
   return [
     ...(JSON.stringify(before.app) !== JSON.stringify(after.app) ? [{ section: 'app' as const, type: 'changed' as const, name: after.app.name }] : []),
     ...diffList('personas', before.personas, after.personas, (item) => item.id),
@@ -99,5 +101,8 @@ export function diffManifests(before: Manifest, after: Manifest): ManifestChange
     ...diffList('features', before.features, after.features, (item) => item.id),
     ...diffList('scenarios', before.scenarios, after.scenarios, (item) => item.id),
     ...diffList('integrations', before.integrations, after.integrations, (item) => item.name),
+    ...setting('attribution', (manifest) => manifest.attribution),
+    ...setting('sample data', (manifest) => manifest.mock),
+    ...setting('draft marker', (manifest) => manifest.draft),
   ];
 }

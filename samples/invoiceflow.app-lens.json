@@ -1,0 +1,78 @@
+{
+  "app": {
+    "name": "InvoiceFlow",
+    "tagline": "Invoicing and payments for small teams",
+    "description": "InvoiceFlow helps small businesses send invoices, collect payments and keep an eye on cash flow. This is a fictional sample app bundled with AppLens.",
+    "category": "Finance",
+    "version": "2.4",
+    "currency": "EUR",
+    "theme": { "primary": "#4f46e5", "accent": "#06b6d4" }
+  },
+  "personas": [
+    { "id": "owner", "label": "Business owner", "description": "Runs the business and needs invoices out the door fast.", "goals": ["Send invoices in under a minute", "See cash flow at a glance", "Spend less time chasing payments"] },
+    { "id": "accountant", "label": "Accountant", "description": "Keeps the books accurate at month end.", "goals": ["Reconcile payments quickly", "Export clean data"] },
+    { "id": "client", "label": "Client", "description": "Receives invoices and pays them.", "goals": ["Understand what is owed", "Pay securely"] }
+  ],
+  "entities": {
+    "Customer": {
+      "count": 10,
+      "display": "company",
+      "description": "Businesses you send invoices to.",
+      "fields": { "company": "company", "contact": "fullName", "email": "email", "country": "country", "since": "date:-900..-30" }
+    },
+    "Invoice": {
+      "count": 16,
+      "display": "number",
+      "description": "Bills sent to customers.",
+      "fields": { "number": "seq:INV-####", "customer": "ref:Customer", "amount": "money:120..4800", "issued": "date:-60..0", "due": "date:0..30", "status": "enum:draft,sent,overdue,paid" }
+    },
+    "Payment": {
+      "count": 10,
+      "display": "reference",
+      "description": "Money received against invoices.",
+      "fields": { "reference": "seq:PAY-#####", "invoice": "ref:Invoice", "amount": "money:120..4800", "method": "enum:card,bank transfer,direct debit", "received": "date:-45..0" }
+    }
+  },
+  "features": [
+    { "id": "quick-invoice", "title": "Invoice in seconds", "description": "Create a polished invoice from a template and send it straight away.", "category": "Billing", "personas": ["owner", "accountant"], "entities": ["Invoice", "Customer"], "highlights": ["Reusable templates", "Automatic numbering", "Send by email or link"] },
+    { "id": "reminders", "title": "Automatic reminders", "description": "Polite nudges go out on a schedule until an invoice is paid.", "category": "Billing", "tier": "Pro", "personas": ["owner"], "entities": ["Invoice"], "highlights": ["Custom schedules", "Stops when paid"] },
+    { "id": "online-payments", "title": "Online payments", "description": "Clients pay by card or bank transfer from the invoice itself.", "category": "Payments", "personas": ["owner", "client"], "entities": ["Payment", "Invoice"], "highlights": ["Card and bank transfer", "Instant receipts", "Marks invoices as paid"] },
+    { "id": "reconciliation", "title": "Payment reconciliation", "description": "Match incoming payments to open invoices in a few clicks.", "category": "Payments", "tier": "Pro", "personas": ["accountant"], "entities": ["Payment"], "highlights": ["Suggested matches", "Partial payments"] },
+    { "id": "cashflow", "title": "Cash flow dashboard", "description": "See what is due, overdue and expected this month.", "category": "Insights", "personas": ["owner", "accountant"], "highlights": ["30-day forecast", "Overdue totals"] },
+    { "id": "client-portal", "title": "Client portal", "description": "Clients see every invoice and payment in one place.", "category": "Collaboration", "personas": ["client"], "entities": ["Invoice", "Payment"], "highlights": ["No account needed", "Download PDFs"] },
+    { "id": "exports", "title": "Accounting exports", "description": "Hand your accountant a clean export every month.", "category": "Insights", "tier": "Business", "personas": ["accountant"], "highlights": ["CSV and XLSX", "Scheduled exports"] }
+  ],
+  "scenarios": [
+    {
+      "id": "get-paid", "title": "Send an invoice and get paid", "persona": "owner", "entity": "Invoice",
+      "description": "From a blank draft to money in the bank.",
+      "steps": [
+        { "action": "create", "narration": "Create a new invoice as a draft.", "values": { "status": "draft", "issued": "$today" } },
+        { "action": "update", "narration": "Send it to the customer.", "set": { "status": "sent" } },
+        { "action": "note", "narration": "A reminder goes out automatically before the due date." },
+        { "action": "update", "narration": "The customer pays online and the invoice is marked as paid.", "set": { "status": "paid" } }
+      ]
+    },
+    {
+      "id": "chase-overdue", "title": "Chase an overdue invoice", "persona": "accountant", "entity": "Invoice",
+      "steps": [
+        { "action": "select", "narration": "Open the oldest overdue invoice.", "where": { "status": "overdue" } },
+        { "action": "note", "narration": "Check the reminder history and call the customer." },
+        { "action": "update", "narration": "The payment arrives, so mark the invoice as paid.", "set": { "status": "paid" } }
+      ]
+    },
+    {
+      "id": "cleanup-draft", "title": "Clean up an old draft", "persona": "owner", "entity": "Invoice",
+      "steps": [
+        { "action": "select", "narration": "Find a draft that is no longer needed.", "where": { "status": "draft" } },
+        { "action": "delete", "narration": "Delete it to keep the list tidy." }
+      ]
+    }
+  ],
+  "integrations": [
+    { "name": "Payment gateway", "category": "Payments", "description": "Takes card payments." },
+    { "name": "Email delivery", "category": "Messaging", "description": "Sends invoices and reminders." },
+    { "name": "Accounting software", "category": "Finance", "description": "Receives exports." }
+  ],
+  "mock": { "seed": "invoiceflow" }
+}

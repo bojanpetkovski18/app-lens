@@ -1,5 +1,5 @@
 import { parseManifest } from '@app-lens/core';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,35 +54,54 @@ export interface StudioApiOptions {
   client?: DraftClient;
 }
 
+/** Writes beside the file and renames, so a crash or a full disk cannot leave a half-written manifest. */
+function saveAtomically(file: string, text: string): void {
+  const target = existsSync(file) ? realpathSync(file) : file;
+  const temporary = `${target}.tmp`;
+  try {
+    writeFileSync(temporary, text, existsSync(target) ? { mode: statSync(target).mode } : undefined);
+    renameSync(temporary, target);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
+}
+
+const ROUTES = new Set(['GET /__app-lens/manifest', 'PUT /__app-lens/manifest', 'POST /__app-lens/attach', 'POST /__app-lens/draft']);
+
 async function route(path: string, request: IncomingMessage, response: ServerResponse, options: StudioApiOptions): Promise<void> {
   const { file } = options;
-  if (path === '/__app-lens/manifest' && request.method === 'GET') {
-    send(response, 200, { file: file ?? null, text: file && existsSync(file) ? readFileSync(file, 'utf8') : null });
+  if (!ROUTES.has(`${request.method} ${path}`)) {
+    send(response, 404, { error: 'Not found.' });
+    return;
+  }
+  if (request.method === 'GET') {
+    send(response, 200, { file: file ?? null, text: file && existsSync(file) ? readFileSync(file, 'utf8').replace(/^\uFEFF/, '') : null });
     return;
   }
   if (!String(request.headers['content-type'] ?? '').startsWith('application/json')) {
     send(response, 415, { error: 'Send JSON.' });
     return;
   }
-  const body = JSON.parse(await readBody(request)) as { text?: unknown; source?: unknown; kind?: unknown };
+  const parsed: unknown = JSON.parse(await readBody(request));
+  if (typeof parsed !== 'object' || parsed === null) throw new CliError('Send a JSON object.');
+  const body = parsed as { text?: unknown; source?: unknown; kind?: unknown };
 
-  if (path === '/__app-lens/manifest' && request.method === 'PUT') {
+  if (path === '/__app-lens/manifest') {
     if (!file) throw new CliError('Studio was opened without a file. Use Download instead.');
     if (typeof body.text !== 'string') throw new CliError('Nothing to save.');
     const result = parseManifest(JSON.parse(body.text));
     if (!result.ok) throw new CliError('Fix the validation problems before saving.');
-    writeFileSync(file, body.text.endsWith('\n') ? body.text : `${body.text}\n`);
+    saveAtomically(file, body.text.endsWith('\n') ? body.text : `${body.text}\n`);
     send(response, 200, { saved: file });
-  } else if (path === '/__app-lens/attach' && request.method === 'POST') {
+  } else if (path === '/__app-lens/attach') {
     if (typeof body.source !== 'string' || existsSync(body.source)) throw new CliError('Enter a GitHub link or a website. Use the Folder tab for local projects.');
     const { manifest, report, thirdParty } = await attach(body.source, { dryRun: true });
     send(response, 200, { manifest, report, thirdParty });
-  } else if (path === '/__app-lens/draft' && request.method === 'POST') {
+  } else {
     if (typeof body.source !== 'string' || !body.source.trim()) throw new CliError('Paste a README or an OpenAPI spec first.');
     const kind = body.kind === 'openapi' ? 'OpenAPI spec' : 'README';
     send(response, 200, await aiDraft(body.source, kind, options.client));
-  } else {
-    send(response, 404, { error: 'Not found.' });
   }
 }
 

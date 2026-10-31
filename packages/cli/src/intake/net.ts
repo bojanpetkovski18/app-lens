@@ -11,7 +11,8 @@ for (const [network, prefix] of [
   ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
 ] as const) blocked.addSubnet(network, prefix, 'ipv4');
 for (const [network, prefix] of [
-  ['::', 128], ['::1', 128], ['64:ff9b::', 96], ['100::', 64], ['2001:db8::', 32], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
+  // ::/96 and 2002::/16 carry an IPv4 address, which could be a private one.
+  ['::', 96], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64], ['2001:db8::', 32], ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
 ] as const) blocked.addSubnet(network, prefix, 'ipv6');
 
 /** True for loopback, private, link-local, metadata and other non-public addresses. */
@@ -74,8 +75,23 @@ function readBody(response: IncomingMessage, maxBytes: number): Promise<string> 
   });
 }
 
+/** The socket timeout only notices silence, so a server sending one byte at a time needs a total limit too. */
+const TOTAL_TIMEOUT_FACTOR = 3;
+
 function once(url: URL, address: string, options: Required<Pick<SafeFetchOptions, 'timeoutMs' | 'maxBytes' | 'userAgent'>>): Promise<{ response: IncomingMessage; text: string }> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const deadline = setTimeout(() => {
+      rejectPromise(new Error(`Timed out fetching ${url.href}.`));
+      request.destroy();
+    }, options.timeoutMs * TOTAL_TIMEOUT_FACTOR);
+    const resolve = (value: { response: IncomingMessage; text: string }) => {
+      clearTimeout(deadline);
+      resolvePromise(value);
+    };
+    const reject = (reason: unknown) => {
+      clearTimeout(deadline);
+      rejectPromise(reason);
+    };
     const request = (url.protocol === 'https:' ? httpsRequest : httpRequest)(
       url,
       {

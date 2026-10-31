@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -13,6 +13,8 @@ const MAX_UNPACKED_BYTES = 500 * 1024 * 1024;
 const MAX_ENTRIES = 50_000;
 const MAX_REF_SEGMENTS = 5;
 const BLOCK = 512;
+/** Names one platform allows and another does not, such as "a?.md" on Windows or a path that is too long. */
+const UNWRITABLE = new Set(['EEXIST', 'EINVAL', 'EISDIR', 'ENAMETOOLONG', 'ENOENT', 'ENOTDIR']);
 
 export interface GithubSource {
   owner: string;
@@ -29,7 +31,7 @@ export function parseGithubUrl(value: string): GithubSource | null {
   } catch {
     return null;
   }
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port || url.username || url.password || url.search || url.hash) return null;
+  if (url.protocol !== 'https:' || (url.hostname !== 'github.com' && url.hostname !== 'www.github.com') || url.port || url.username || url.password || url.search || url.hash) return null;
   const [owner, rawRepo, tree, ref, ...path] = url.pathname.split('/').filter(Boolean);
   const repo = rawRepo?.replace(/\.git$/, '');
   if (!owner || !repo || !OWNER.test(owner) || !REPO.test(repo) || repo === '.' || repo === '..') return null;
@@ -106,15 +108,21 @@ export function extractTar(archive: Buffer, dest: string, stripComponents = 1): 
     const target = resolve(root, ...relative);
     if (!target.startsWith(root + sep)) throw new CliError(`The archive has an unsafe path: ${name}`);
 
-    if (type === '5') {
-      mkdirSync(target, { recursive: true });
-    } else if (type === '0' || type === '\0' || type === '7') {
-      unpacked += size;
-      if (unpacked > MAX_UNPACKED_BYTES) throw new CliError('The archive is too large once unpacked.');
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, data);
+    const isFile = type === '0' || type === '\0' || type === '7';
+    if (isFile) unpacked += size;
+    if (unpacked > MAX_UNPACKED_BYTES) throw new CliError('The archive is too large once unpacked.');
+    try {
+      if (type === '5') {
+        mkdirSync(target, { recursive: true });
+      } else if (isFile) {
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, data);
+      }
+      // Symlinks, hard links and devices are skipped on purpose.
+    } catch (error) {
+      // One odd file should not stop a draft, which only reads a few of them.
+      if (!UNWRITABLE.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
     }
-    // Symlinks, hard links and devices are skipped on purpose.
   }
 }
 
@@ -152,7 +160,9 @@ export async function withGithubSource<T>(source: GithubSource, consume: (folder
   const folder = mkdtempSync(join(tmpdir(), 'app-lens-github-'));
   try {
     extractTar(archive, folder);
-    return await consume(path ? join(folder, path) : folder);
+    const target = path ? join(folder, path) : folder;
+    if (!statSync(target, { throwIfNoEntry: false })?.isDirectory()) throw new CliError(`${path} is not a folder in that repository.`);
+    return await consume(target);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

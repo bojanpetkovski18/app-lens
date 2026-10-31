@@ -93,3 +93,76 @@ test('opens a file and saves changes back to it', async ({ page }) => {
   const saved = JSON.parse(readFileSync('dist/e2e-opened.json', 'utf8'));
   expect(saved.app.name).toBe('TaskPilot Saved');
 });
+
+test('JSON that only looks like a manifest cannot blank the page', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'JSON' }).click();
+  const editor = page.getByRole('textbox', { name: 'Manifest JSON' });
+  await editor.fill('{"app":{"name":"A"},"entities":{"Thing":{"count":1}}}');
+  await expect(page.getByRole('button', { name: 'Form' })).toBeDisabled();
+  await page.waitForTimeout(350);
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Manifest JSON' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('the form works on a manifest with no app yet', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'JSON' }).click();
+  await page.getByRole('textbox', { name: 'Manifest JSON' }).fill('{}');
+  await page.getByRole('button', { name: 'Form' }).click();
+  await page.getByRole('textbox', { name: 'Name' }).first().fill('Started');
+  await expect(page.getByRole('region', { name: 'Live preview' }).getByRole('heading', { level: 1 })).toHaveText('Started');
+  expect(errors).toEqual([]);
+});
+
+test('clearing a list of goals does not leave the manifest invalid', async ({ page }) => {
+  await page.goto('/');
+  await page.getByText('Personas').first().click();
+  const goals = page.getByRole('textbox', { name: 'Goals, one per line' }).first();
+  await goals.fill('Ship it');
+  await goals.fill('');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('shows when a file has unsaved changes', async ({ page }) => {
+  await page.route('**/__app-lens/manifest', (route) =>
+    route.request().method() === 'PUT' ? route.fulfill({ json: { saved: 'file.json' } }) : route.fallback());
+  await page.goto('http://127.0.0.1:4413/');
+  const name = page.getByRole('textbox', { name: 'Name' }).first();
+  await expect(name).not.toHaveValue('My App');
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+  await name.fill('Changed');
+  await expect(page.getByRole('button', { name: 'Save (unsaved changes)' })).toBeVisible();
+  await page.getByRole('button', { name: /^Save/ }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved file.json' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+  await name.fill('Changed again');
+  await expect(page.getByRole('status').filter({ hasText: 'Saved file.json' })).toHaveCount(0);
+});
+
+test('a draft reviewed against nothing valid says what will happen', async ({ page }) => {
+  await page.route('**/__app-lens/draft', (route) => route.fulfill({ json: { manifest: { app: { name: 'Drafted' } } } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'JSON' }).click();
+  await page.getByRole('textbox', { name: 'Manifest JSON' }).fill('{ broken');
+  await page.getByRole('button', { name: 'Draft with AI' }).click();
+  await page.getByRole('textbox', { name: 'Source text' }).fill('# Notes');
+  await page.getByRole('button', { name: 'Draft manifest' }).click();
+  const review = page.getByRole('region', { name: 'Review draft' });
+  await expect(review).toContainText('replaces');
+  await expect(review).not.toContainText('No differences');
+});
+
+test('an error page from the server still gives a readable message', async ({ page }) => {
+  await page.route('**/__app-lens/draft', (route) => route.fulfill({ status: 502, body: 'Bad gateway' }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Draft with AI' }).click();
+  await page.getByRole('textbox', { name: 'Source text' }).fill('# Notes');
+  await page.getByRole('button', { name: 'Draft manifest' }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('HTTP 502');
+});

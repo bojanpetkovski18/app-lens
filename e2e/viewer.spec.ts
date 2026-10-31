@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 test.beforeEach(({ page }, testInfo) => {
   page.on('pageerror', (error) => testInfo.attach('pageerror', { body: error.message }));
@@ -44,4 +47,25 @@ test('embed mode hides the top bar and applies URL theming', async ({ page }) =>
   await expect(page.locator('.al-root')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('.al-topbar')).toHaveCount(0);
   await expect(page.getByRole('tab', { selected: true })).toContainText('Features');
+});
+
+test('an attached project does not leave a dead link in the address bar', async ({ page }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'app-lens-link-'));
+  const project = join(dir, 'link-project');
+  mkdirSync(project);
+  writeFileSync(join(project, 'package.json'), '{"name":"picked-folder"}');
+  try {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Attach project' }).click();
+    await page.getByRole('dialog').locator('input[type=file]').setInputFiles(project);
+    await expect(page.locator('h1')).toHaveText('Picked folder');
+    await page.selectOption('.al-picker select', { label: 'TaskPilot' });
+    await page.selectOption('.al-picker select', { label: 'link-project' });
+    await expect(page.locator('h1')).toHaveText('Picked folder');
+    await page.reload();
+    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

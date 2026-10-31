@@ -32,7 +32,7 @@ Numbered, and never renumbered. D001 to D012 were written up on 2026-10-31 from 
 - **Decision:** `app-lens build` writes a Content-Security-Policy meta tag into each site.
 - **Why:** Built sites go on hosts where AppLens can't set headers.
 - **Alternatives:** Document the headers and leave them to the host.
-- **Trade-offs:** A meta tag can't set `frame-ancestors`, and embedding has to stay possible anyway.
+- **Trade-offs:** A meta tag can't set `frame-ancestors`, and embedding has to stay possible anyway. Since 2026-10-31 the policy has no `unsafe-inline`.
 
 ## D005: Add an optional `draft` key to the manifest (Phase 4)
 
@@ -137,3 +137,19 @@ Numbered, and never renumbered. D001 to D012 were written up on 2026-10-31 from 
 - **Why:** Prettier would rewrite most of the code base with no change in behaviour, and the long-line house style is deliberate.
 - **Alternatives:** Prettier with a wide print width.
 - **Trade-offs:** Formatting relies on review. The editorconfig check skips indent size, because continuation lines are aligned by hand.
+
+## D018: Run zod without its JIT
+
+- **Date:** 2026-10-31
+- **Decision:** Set `z.config({ jitless: true })` in core.
+- **Why:** zod's startup test for `eval` logs a violation on any page with a strict policy, including sites that embed AppLens.
+- **Alternatives:** Allow `unsafe-eval`, which defeats the policy.
+- **Trade-offs:** Validation can't use compiled parsers. The largest manifest measured 12 ms, within run-to-run variation of the 10 ms before.
+
+## D019: Keep the audit as a test
+
+- **Date:** 2026-10-31
+- **Decision:** `e2e/audit.spec.ts` runs every screen at each width and theme on every PR.
+- **Why:** A one-off audit goes stale with the next change, and playbook mistakes came from overlays that were never opened.
+- **Alternatives:** A manual checklist.
+- **Trade-offs:** It adds 161 tests, and 46 seconds locally for the full e2e suite.

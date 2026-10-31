@@ -135,6 +135,7 @@ Elsewhere:
 
 - Added a `dev` branch and merged every phase into it. `dev` is now the default branch, CI runs on pushes to it, and new work uses `#00nn-...` branches.
 - Added `CLAUDE.md`, `PROGRESS.md`, `DECISIONS.md` and `docs/ARCHITECTURE.md`, plus an AI-assistance note in the README. HANDOFF section 0 now describes the workflow in use.
+- Added `e2e/audit.spec.ts` and `docs/AUDIT.md`. Fixes: zod runs jitless, built sites allow no inline styles, `useDialog` handles dialog focus, table wrappers can be scrolled by keyboard, and long saved paths wrap.
 - Pinned CI actions to commit SHAs and direct dependencies to exact versions. CI gained ESLint, a gitleaks scan of the full history, actionlint and editorconfig-checker.
 
 ---

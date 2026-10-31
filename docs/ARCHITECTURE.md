@@ -38,7 +38,7 @@ The CLI's build copies the viewer, Studio and embed builds into `packages/cli/di
 
 `parseManifest` runs two stages: zod checks the shape, then cross-reference checks cover refs, personas and scenario steps. If the first stage fails, the second isn't reported until those errors are fixed.
 
-Every entry point treats a manifest as untrusted. The schema caps the sizes that get rendered, and the largest manifest generates 15,000 records.
+Zod runs without its JIT, so its startup test for `eval` never trips a strict policy. Every entry point treats a manifest as untrusted. The schema caps the sizes that get rendered, and the largest manifest generates 15,000 records.
 
 ## Generated data
 
@@ -53,6 +53,7 @@ Every entry point treats a manifest as untrusted. The schema caps the sizes that
 - CSS classes start with `al-` and are scoped under `.al-root`.
 - The embed shares one stylesheet between instances. It waits for inline JSON and aborts in-flight fetches.
 - `onEvent`, the `app-lens:event` DOM event and iframe `postMessage` all carry the same analytics events.
+- `useDialog` gives every modal the same focus handling: focus moves in, Tab stays in, Escape closes and focus returns to the opener.
 - The demo plays as a rendered animation. "Download video" draws a separate canvas and records it to WebM with `MediaRecorder`, in real time.
 
 ## Intake
@@ -92,6 +93,6 @@ Each reply goes through `parseManifest`. Problems are sent back up to twice, wit
 
 ## Delivery
 
-`app-lens build` writes a static site with a Content-Security-Policy meta tag. `preview` serves files with `X-Content-Type-Options: nosniff`, and `--watch` adds live reload over server-sent events.
+`app-lens build` writes a static site with a Content-Security-Policy meta tag that allows no inline scripts or styles. `preview` serves files with `X-Content-Type-Options: nosniff`, and `--watch` adds live reload over server-sent events.
 
 GitHub Actions runs `ci.yml` on PRs and on pushes to `dev` and `main`, with jobs for verification, a full-history secret scan and repository lint. `pages.yml` publishes the fictional samples and Studio on pushes to `main`.

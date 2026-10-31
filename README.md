@@ -87,6 +87,7 @@ npx playwright install chromium && npm run e2e
 - [HANDOFF.md](HANDOFF.md): project status, workflow and full manifest reference
 - [REBUILD.md](REBUILD.md): complete build record
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works
+- [docs/AUDIT.md](docs/AUDIT.md): accessibility and polish audit
 - [PROGRESS.md](PROGRESS.md) and [DECISIONS.md](DECISIONS.md): status, measured results and why things are built this way
 
 ## Built with AI assistance

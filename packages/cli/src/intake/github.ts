@@ -121,7 +121,7 @@ export function extractTar(archive: Buffer, dest: string, stripComponents = 1): 
 export type FetchLike = (url: string, init: { headers: Record<string, string>; redirect: 'follow' }) => Promise<Response>;
 
 /** Downloads and unpacks into a temp folder, and always removes it afterwards. */
-export async function withGithubSource<T>(source: GithubSource, use: (folder: string) => T | Promise<T>, fetchImpl: FetchLike = fetch, token = process.env.GITHUB_TOKEN): Promise<T> {
+export async function withGithubSource<T>(source: GithubSource, consume: (folder: string) => T | Promise<T>, fetchImpl: FetchLike = fetch, token = process.env.GITHUB_TOKEN): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json', 'User-Agent': 'AppLens-intake' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -152,7 +152,7 @@ export async function withGithubSource<T>(source: GithubSource, use: (folder: st
   const folder = mkdtempSync(join(tmpdir(), 'app-lens-github-'));
   try {
     extractTar(archive, folder);
-    return await use(path ? join(folder, path) : folder);
+    return await consume(path ? join(folder, path) : folder);
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }

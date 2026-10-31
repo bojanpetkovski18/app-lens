@@ -72,7 +72,7 @@ function assetRoot(): string {
 export function readManifestFile(file: string): unknown {
   if (!existsSync(file)) throw new CliError(`File not found: ${file}`);
   if (statSync(file).isDirectory()) throw new CliError(`${file} is a folder. Pass a manifest file.`);
-  const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
+  const text = readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   try {
     return JSON.parse(text);
   } catch (error) {

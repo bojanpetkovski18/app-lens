@@ -8,6 +8,7 @@ const CHROME_HEIGHT = 44;
 const CAPTION_HEIGHT = 64;
 const PADDING = 64;
 const FADE_MS = 400;
+const VISIBLE_STEPS = 7;
 const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
 export interface VideoColors {
@@ -182,8 +183,11 @@ function drawScene(ctx: Ctx, manifest: Manifest, scene: DemoScene, progress: num
       heading(scene.title);
       const step = scenarioStepAt(scene, progress);
       setFont(ctx, 20);
-      scene.scenario.steps.slice(0, 7).forEach((item, index) => {
-        const y = top + 64 + index * 58;
+      // Long walkthroughs scroll, so the current step is always on screen.
+      const first = Math.max(0, Math.min(step - 3, scene.scenario.steps.length - VISIBLE_STEPS));
+      scene.scenario.steps.slice(first, first + VISIBLE_STEPS).forEach((item, offset) => {
+        const index = first + offset;
+        const y = top + 64 + offset * 58;
         if (index === step) {
           ctx.fillStyle = colors.primary;
           roundedRect(ctx, PADDING, y, VIDEO_WIDTH - PADDING * 2, 50, 10);
@@ -293,8 +297,6 @@ export function recordDemo(manifest: Manifest, script: DemoScript, { colors, sig
     const chunks: Blob[] = [];
     const started = performance.now();
     recorder.ondataavailable = (event) => chunks.push(event.data);
-    recorder.onerror = () => reject(new Error('Recording failed.'));
-
     const timer = setInterval(() => {
       if (signal?.aborted) {
         clearInterval(timer);
@@ -311,6 +313,10 @@ export function recordDemo(manifest: Manifest, script: DemoScript, { colors, sig
         recorder.stop();
       }
     }, 1000 / FPS);
+    recorder.onerror = () => {
+      clearInterval(timer);
+      reject(new Error('Recording failed.'));
+    };
     recorder.start(1000);
   });
 }

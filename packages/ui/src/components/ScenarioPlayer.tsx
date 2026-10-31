@@ -69,9 +69,11 @@ interface PlayerProps {
 
 function Player({ manifest, dataset, scenario, seed }: PlayerProps) {
   const frames = useMemo(() => runScenario(manifest, dataset, scenario, { seed }), [manifest, dataset, scenario, seed]);
-  const [position, setPosition] = useState(-1);
+  const [storedPosition, setPosition] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const last = frames.length - 1;
+  // A live preview can shorten the walkthrough while it is open.
+  const position = Math.min(storedPosition, last);
   const frame = position >= 0 ? frames[position] : undefined;
   const entity = manifest.entities[scenario.entity];
   const fields = entity ? getEntityFields(entity) : [];

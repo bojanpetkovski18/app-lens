@@ -1,6 +1,6 @@
 import { displayOf, getEntityFields, recordsToCsv, type Dataset, type Manifest } from '@app-lens/core';
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { downloadBlob, humanize, slug } from '../util';
+import { downloadBlob, humanize, recordIndex, slug } from '../util';
 import { FieldValue } from './FieldValue';
 
 export interface DataFocus {
@@ -38,8 +38,15 @@ export function DataExplorer({ manifest, dataset, focus, onFocus, onNewData }: D
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return records;
-    return records.filter((record) => Object.values(record).some((value) => String(value ?? '').toLowerCase().includes(needle)));
-  }, [records, query]);
+    const matches = (value: unknown) => String(value ?? '').toLowerCase().includes(needle);
+    // Links show the other record's name, so that name has to be searchable too.
+    const links = entity ? getEntityFields(entity).filter(([, spec]) => spec.kind === 'ref') : [];
+    return records.filter((record) => Object.values(record).some(matches) || links.some(([name, spec]) => {
+      const target = spec.target ?? '';
+      const linked = recordIndex(dataset[target] ?? []).get(String(record[name]));
+      return linked !== undefined && matches(displayOf(manifest, target, linked));
+    }));
+  }, [records, query, entity, dataset, manifest]);
 
   const focusedId = focus?.id;
   useEffect(() => {

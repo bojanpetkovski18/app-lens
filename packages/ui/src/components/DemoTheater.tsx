@@ -75,7 +75,8 @@ export function DemoTheater({ manifest, dataset, persona, seed }: DemoTheaterPro
     );
   }
   if (phase === 'researching') return <Research stages={researchStages(manifest, script)} onDone={finishResearch} />;
-  return <DemoVideo manifest={manifest} script={script} onResearchAgain={() => setPhase('researching')} />;
+  // Keyed so another persona's shorter script starts at zero instead of inheriting the position.
+  return <DemoVideo key={cacheKey} manifest={manifest} script={script} onResearchAgain={() => setPhase('researching')} />;
 }
 
 function Research({ stages, onDone }: { stages: { label: string; detail: string }[]; onDone: () => void }) {
@@ -248,8 +249,8 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
     setPlaying(!playing || ended);
   };
   const toggleFullscreen = () => {
-    if (fullscreen) void document.exitFullscreen();
-    else void rootRef.current?.requestFullscreen();
+    const change = fullscreen ? document.exitFullscreen() : rootRef.current?.requestFullscreen();
+    change?.catch(() => {});
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
@@ -314,9 +315,11 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
             </div>
           </div>
           <span className="al-num">{clock(elapsed)} / {clock(script.durationMs)}</span>
-          <button type="button" className="al-btn al-btn-ghost" onClick={toggleFullscreen}>
-            {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          </button>
+          {document.fullscreenEnabled === false ? null : (
+            <button type="button" className="al-btn al-btn-ghost" onClick={toggleFullscreen}>
+              {fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            </button>
+          )}
         </div>
       </section>
       <div className="al-toolbar">

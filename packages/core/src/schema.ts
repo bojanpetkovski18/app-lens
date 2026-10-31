@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Without this, zod tests for eval on load, and a strict Content-Security-Policy reports that as a violation.
+z.config({ jitless: true });
+
 export const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 /** Ends up in a CSS custom property, so only plain family names are allowed. */
 export const FONT_STACK = /^[\w\s,'"-]{1,120}$/;

@@ -1,6 +1,6 @@
 import { diffManifests, parseManifest, starterManifest, type Manifest, type ManifestInput } from '@app-lens/core';
-import { AppLensView, IssuesView } from '@app-lens/ui';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { AppLensView, IssuesView, useDialog } from '@app-lens/ui';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { analyze, createEditor, editorReducer, locatePath, serialize } from './editor';
 import { FormEditor } from './FormEditor';
 
@@ -31,6 +31,17 @@ async function post(path: string, body: unknown, method = 'POST'): Promise<Recor
   const result = (await response.json()) as Record<string, unknown>;
   if (!response.ok) throw new Error(String(result.error ?? `HTTP ${response.status}`));
   return result;
+}
+
+function AiDialog({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const dialog = useDialog<HTMLDivElement>(onClose);
+  return (
+    <div className="al-root al-dialog-root">
+      <div ref={dialog} className="al-card al-dialog" role="dialog" aria-modal="true" aria-label="Draft with AI" tabIndex={-1}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 interface Proposal {
@@ -246,22 +257,20 @@ export function App() {
       ) : null}
 
       {dialog === 'ai' ? (
-        <div className="al-root al-dialog-root">
-          <div className="al-card al-dialog" role="dialog" aria-modal="true" aria-label="Draft with AI">
-            <h2>Draft with AI</h2>
-            <p className="al-muted">Claude drafts a manifest from your text, and you review it before anything changes. This sends the text to the Claude API and needs ANTHROPIC_API_KEY set where <code>app-lens studio</code> runs.</p>
-            <div className="al-segmented" role="group" aria-label="Source type">
-              <button type="button" aria-pressed={aiKind === 'readme'} onClick={() => setAiKind('readme')}>README</button>
-              <button type="button" aria-pressed={aiKind === 'openapi'} onClick={() => setAiKind('openapi')}>OpenAPI spec</button>
-            </div>
-            <textarea className="al-input" rows={10} aria-label="Source text" value={aiSource} onChange={(event) => setAiSource(event.target.value)} />
-            {aiError ? <div className="al-alert al-alert-error" role="alert">{aiError}</div> : null}
-            <div className="al-row">
-              <button type="button" className="al-btn al-btn-primary" disabled={aiBusy || !aiSource.trim()} onClick={() => void draftWithAi()}>{aiBusy ? 'Drafting…' : 'Draft manifest'}</button>
-              <button type="button" className="al-btn al-btn-ghost" onClick={() => setDialog(null)}>Cancel</button>
-            </div>
+        <AiDialog onClose={() => setDialog(null)}>
+          <h2>Draft with AI</h2>
+          <p className="al-muted">Claude drafts a manifest from your text, and you review it before anything changes. This sends the text to the Claude API and needs ANTHROPIC_API_KEY set where <code>app-lens studio</code> runs.</p>
+          <div className="al-segmented" role="group" aria-label="Source type">
+            <button type="button" aria-pressed={aiKind === 'readme'} onClick={() => setAiKind('readme')}>README</button>
+            <button type="button" aria-pressed={aiKind === 'openapi'} onClick={() => setAiKind('openapi')}>OpenAPI spec</button>
           </div>
-        </div>
+          <textarea className="al-input" rows={10} aria-label="Source text" value={aiSource} onChange={(event) => setAiSource(event.target.value)} />
+          {aiError ? <div className="al-alert al-alert-error" role="alert">{aiError}</div> : null}
+          <div className="al-row">
+            <button type="button" className="al-btn al-btn-primary" disabled={aiBusy || !aiSource.trim()} onClick={() => void draftWithAi()}>{aiBusy ? 'Drafting…' : 'Draft manifest'}</button>
+            <button type="button" className="al-btn al-btn-ghost" onClick={() => setDialog(null)}>Cancel</button>
+          </div>
+        </AiDialog>
       ) : null}
     </div>
   );

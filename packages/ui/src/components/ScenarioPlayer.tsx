@@ -151,7 +151,7 @@ function Player({ manifest, dataset, scenario, seed }: PlayerProps) {
         </section>
       ) : null}
 
-      <div className="al-table-wrap">
+      <div className="al-table-wrap" role="region" aria-label="Records" tabIndex={0}>
         <table className="al-table">
           <thead>
             <tr>{fields.slice(0, PREVIEW_COLUMNS).map(([name]) => <th key={name} scope="col">{humanize(name)}</th>)}</tr>

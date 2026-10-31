@@ -90,7 +90,7 @@ export function Features({ manifest, persona, onOpenData }: FeaturesProps) {
           ))}
         </div>
       ) : (
-        <div className="al-table-wrap">
+        <div className="al-table-wrap" role="region" aria-label="Who gets what" tabIndex={0}>
           <table className="al-matrix">
             <thead>
               <tr>

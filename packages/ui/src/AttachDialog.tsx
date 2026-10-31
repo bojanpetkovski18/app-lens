@@ -1,6 +1,7 @@
 import { draftManifest, shouldReadPath, signalsFromFiles, type ManifestInput, type ProjectFile } from '@app-lens/core';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { parse as parseYaml } from 'yaml';
+import { useDialog } from './useDialog';
 
 const MAX_FILES = 2000;
 const MAX_FILE_BYTES = 512 * 1024;
@@ -34,16 +35,7 @@ export default function AttachDialog({ onClose, onDraft }: AttachDialogProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const titleId = useId();
-  const dialog = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    dialog.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const dialog = useDialog<HTMLDivElement>(onClose);
 
   const onFolder = async (list: FileList | null) => {
     if (!list || list.length === 0) return;

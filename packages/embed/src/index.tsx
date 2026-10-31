@@ -1,5 +1,5 @@
 import { parseManifest } from '@app-lens/core';
-import { AppLensView, Frame, sanitizeTheme, TABS, type AppLensEvent, type Tab } from '@app-lens/ui';
+import { AppLensView, fetchManifest, Frame, sanitizeTheme, TABS, type AppLensEvent, type Tab } from '@app-lens/ui';
 import styles from '@app-lens/ui/styles.css?inline';
 import { createRoot, type Root } from 'react-dom/client';
 
@@ -133,9 +133,7 @@ class AppLensElement extends HTMLElement {
       this.#render();
       const controller = new AbortController();
       this.#abort = controller;
-      const response = await fetch(url.href, { credentials: 'omit', signal: controller.signal });
-      if (!response.ok) throw new Error(`Could not load manifest (HTTP ${response.status}).`);
-      const manifest: unknown = await response.json();
+      const manifest = await fetchManifest(url.href, controller.signal);
       if (request === this.#request) this.#apply(manifest);
     } catch (error) {
       if (request !== this.#request) return;

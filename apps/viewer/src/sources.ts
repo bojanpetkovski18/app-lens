@@ -1,3 +1,4 @@
+import { fetchManifest } from '@app-lens/ui';
 export interface ManifestSource {
   key: string;
   label: string;
@@ -24,17 +25,6 @@ export function sampleSources(): ManifestSource[] {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-export async function fetchJson(url: string, signal?: AbortSignal): Promise<unknown> {
-  const response = await fetch(url, { credentials: 'omit', signal });
-  if (!response.ok) throw new Error(`Could not load manifest (HTTP ${response.status}).`);
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error('The manifest is not valid JSON.');
-  }
-}
-
 /** Only http(s) manifests can be loaded from a URL. */
 export function sourceFromUrl(value: string): ManifestSource | null {
   let url: URL;
@@ -44,7 +34,7 @@ export function sourceFromUrl(value: string): ManifestSource | null {
     return null;
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-  return { key: `url:${url.href}`, label: url.href, group: 'From URL', load: (signal) => fetchJson(url.href, signal) };
+  return { key: `url:${url.href}`, label: url.href, group: 'From URL', load: (signal) => fetchManifest(url.href, signal) };
 }
 
 /**

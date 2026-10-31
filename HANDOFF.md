@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-30, after **Phase 6**.
+Last updated: 2026-10-31, before the 1.0.0 release.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -9,87 +9,35 @@ For a full record of everything built so far and step-by-step instructions to re
 
 ## 0. Start here: GitHub repo and pull request workflow
 
-All work is tracked in git on GitHub. **Everything built so far (Phases 1 and 2) goes into the first pull request.** Every later phase is its own branch and its own PR.
+The repository is public at `bojanpetkovski18/app-lens`. `dev` is the default branch and `main` receives releases. Agent rules and verified commands are in [CLAUDE.md](CLAUDE.md), status is in [PROGRESS.md](PROGRESS.md), and decisions are in [DECISIONS.md](DECISIONS.md).
 
-### 0.1 One-time setup on the new machine
+### 0.1 One-time setup on a new machine
 
-1. **Install the tools:** Git, Node 22 LTS (see section 3) and, optionally, the GitHub CLI (`gh`).
-2. **Use your personal identity** (see section 8):
+1. **Install the tools:** Git and Node 22 LTS (see section 3).
+2. **Clone and set your identity for this repository only** (see section 8):
    ```bash
-   git config --global user.name  "Your Name"
-   git config --global user.email "you@personal-email.example"
-   gh auth login        # only if you use the GitHub CLI
+   git clone https://github.com/bojanpetkovski18/app-lens.git
+   cd app-lens
+   git config user.name  "Your Name"
+   git config user.email "you@personal-email.example"
    ```
-3. **Copy the project** without `node_modules` and any `dist` folders.
-4. **Check it works before committing anything:**
+3. **Check it works before committing anything:**
    ```bash
-   npm install
+   npm ci
    npm run typecheck
    npm test
    npm run build
    ```
 
-### 0.2 Create the GitHub repository
+### 0.2 Rules for every piece of work
 
-- **On github.com:** *New repository*, name it `app-lens`, choose Private (recommended until you decide to publish), and **do not** add a README, `.gitignore` or licence. The repo must start empty so the first push has no conflicts.
-- **Or with the CLI**, from inside the project folder:
-  ```bash
-  gh repo create app-lens --private
-  ```
-
-### 0.3 Base branch and the first PR (everything until now)
-
-A PR needs a base branch to merge into, so `main` starts with one empty commit and all the code goes into the first PR.
-
-```bash
-# 1. Empty main branch
-git init -b main
-git commit --allow-empty -m "chore: initial empty commit"
-git remote add origin https://github.com/<your-user>/app-lens.git
-git push -u origin main
-
-# 2. Branch for PR #1
-git switch -c phase-1-2/foundation
-```
-
-Before the first commit on this branch:
-1. Add a `LICENSE` with your name (e.g. MIT) and a short public `README.md` (what AppLens is, quick start, link to this file).
-2. Stage and check what will be committed:
-   ```bash
-   git add .
-   git status                 # node_modules/ and dist/ must NOT appear
-   ```
-3. Commit, push and open the PR:
-   ```bash
-   git commit -m "feat: AppLens MVP and distribution (phases 1-2)"
-   git push -u origin phase-1-2/foundation
-   gh pr create --base main --title "Phases 1-2: MVP and distribution" --body "See HANDOFF.md sections 2 and 10."
-   ```
-   Without the CLI, open the repo on github.com and click *Compare & pull request*.
-4. Review the diff on GitHub, then **squash and merge**. Locally:
-   ```bash
-   git switch main
-   git pull
-   git branch -d phase-1-2/foundation
-   ```
-5. Optional, recommended: in *Settings → Branches*, protect `main` (require a PR before merging; once CI exists, require it to pass).
-
-### 0.4 Rules for every next phase (one phase = one PR)
-
-| PR | Branch | Content |
-|---|---|---|
-| #1 | `phase-1-2/foundation` | Everything until now, plus `LICENSE` and `README.md` |
-| #2 | `phase-3/code-review` | Senior code review: find and fix bugs, issues and performance problems |
-| #3 | `phase-4/smarts` | Importers, export, analytics hooks, video export |
-| #4 | `phase-5/project-intake` | Attach a project as a folder, GitHub link or published URL |
-| #5 | `phase-6/studio` | Visual manifest editor |
-
-- **Start each phase from an up-to-date `main`:** `git switch main; git pull; git switch -c phase-N/<slug>`.
-- **Commit in small steps** with clear messages (`feat:`, `fix:`, `perf:`, `test:`, `docs:`, `chore:`).
-- **Before opening the PR**, `npm run typecheck`, `npm test` and `npm run build` must all pass.
-- **PR description:** scope, list of changes, how to test, checks run, and security/privacy notes.
-- **Update this file in the same PR:** the status table in section 2, the "Last updated" line, and any changed commands, caveats or next steps. Also add the phase to Part A of [REBUILD.md](REBUILD.md) and update Part B if behaviour changed.
-- **Never** push directly to `main`, force-push a shared branch, or commit secrets. An agent opens the PR; the user reviews and merges.
+- **Start from an up-to-date `dev`:** `git switch dev; git pull; git switch -c "#00nn-three-to-seven-words"`.
+- **Commit in small steps** with clear messages (`feat:`, `fix:`, `perf:`, `test:`, `docs:`, `chore:`, `ci:`).
+- **Before pushing**, `npm run typecheck`, `npm test`, `npm run build` and `npm run e2e` must all pass.
+- **Open a PR into `dev`.** The owner opens and merges PRs on GitHub. The description covers scope, changes, how to test, checks run, and security and privacy notes.
+- **Update these in the same PR:** `PROGRESS.md`, `DECISIONS.md`, the status table in section 2, any changed commands or caveats, and Part A of [REBUILD.md](REBUILD.md).
+- **Never** push directly to `main`, force-push a shared branch, or commit secrets.
+- **To release:** merge `dev` into `main` through a PR, using a merge commit so the branches stay in step.
 
 ## 1. What AppLens is
 
@@ -105,16 +53,16 @@ It is a personal project. It must stay **independent of any employer or third-pa
 
 ## 2. Status
 
-| Phase | Scope | PR | Status |
+| Phase | Scope | Branch | Status |
 |---|---|---|---|
-| 1. MVP | Manifest schema and validation, mock data engine, scenario runner, React viewer (Overview, Features, Data, Walkthroughs), persona switch, samples | #1 | Done |
-| 2. Distribution | `@app-lens/ui` shared package, theming (colours, radius, font, light/dark/auto), embedded mode, `<app-lens>` web component, iframe mode, standalone sites, CLI (`init`, `validate`, `build`, `preview`, `schema`), JSON Schema for editors, **product demo video** with a research-progress step | #1 | Done |
-| 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Done |
-| 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export; plus `lint`, `diff`, CSV/JSON record export and `preview --watch` | #3 | Done |
-| 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Done |
-| 6. Studio | Visual manifest editor with live preview, optional AI drafting, `app-lens studio`, and a GitHub Pages workflow | #5 | Done |
+| 1. MVP | Manifest schema and validation, mock data engine, scenario runner, React viewer (Overview, Features, Data, Walkthroughs), persona switch, samples | `phase-1-2/foundation` | Merged into `dev` |
+| 2. Distribution | `@app-lens/ui` shared package, theming (colours, radius, font, light/dark/auto), embedded mode, `<app-lens>` web component, iframe mode, standalone sites, CLI (`init`, `validate`, `build`, `preview`, `schema`), JSON Schema for editors, **product demo video** with a research-progress step | `phase-1-2/foundation` | Merged into `dev` |
+| 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | `phase-3/code-review` | Merged into `dev` |
+| 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export; plus `lint`, `diff`, CSV/JSON record export and `preview --watch` | `phase-4/smarts` | Merged into `dev` |
+| 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | `phase-5/project-intake` | Merged into `dev` |
+| 6. Studio | Visual manifest editor with live preview, optional AI drafting, `app-lens studio`, and a GitHub Pages workflow | `phase-6/studio` | Merged into `dev` |
 
-Verified at the end of Phase 6: 304 unit tests pass (118 core, 126 CLI, 30 UI, 12 embed, 9 viewer, 9 studio), 29 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
+Verified on 2026-10-31: 308 unit tests pass (118 core, 126 CLI, 30 UI, 13 embed, 12 viewer, 9 studio), 190 Playwright e2e tests pass, typecheck and lint pass, `npm run build` succeeds, and `npm audit --omit=dev` reports 0. See [PROGRESS.md](PROGRESS.md) for current numbers. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
 
 ## 3. Requirements and quick start
 
@@ -136,7 +84,7 @@ npm run app-lens -- --help
 
 Gotchas:
 - `npm run dev -- --port X` does not work, because the extra argument becomes the Vite root. Use plain `npm run dev`.
-- If two Vite versions get installed (TS2769 in `vite.config.ts`), run `npm dedupe`. The root `overrides` pins `vite ^6.4.5`.
+- If two Vite versions get installed (TS2769 in `vite.config.ts`), run `npm dedupe`. The root `overrides` pins `vite 6.4.5`.
 - After moving or renaming the folder, run `npm install` again. Workspace links are absolute junctions on Windows.
 
 ## 4. Repository layout
@@ -310,7 +258,6 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 
 - Generating the largest allowed manifest (15,000 records with 40 fields) takes about 1.4 seconds on the main thread. Typical manifests take a few milliseconds. A worker could remove the pause if real manifests get that large.
 - Repeat builds into the same folder leave old hashed assets behind, because `build` never deletes files.
-- Fetched manifests have no byte limit. The schema limits what gets rendered, not what gets downloaded.
 - `app-lens:resize` posts to `'*'` on purpose: the viewer can't know its embedder, and the message only carries a height.
 - Validation runs in two stages. If the schema stage fails, reference checks (unknown refs, personas) are only reported after those errors are fixed.
 - The on-screen demo is a rendered animation. "Download video" records a separate canvas render to WebM in real time, so it takes as long as the demo. MP4 is not produced.
@@ -326,12 +273,12 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 ## 10. Next steps
 
 **Housekeeping (do first on a new machine)**
-1. Done: the GitHub repo exists and PR #1 holds everything so far, including `LICENSE` and `README.md`.
-2. Done: Phase 3 is in PR #2.
+1. Done: the GitHub repo exists, with everything through Phase 6 merged into `dev`.
+2. Done: Phase 3 is on `phase-3/code-review`.
 
 **Phase 3: Code review (senior software developer)**
 
-The agent acts as a **senior software developer** reviewing the whole codebase, as if it were someone else's code before a release. It looks for bugs of **every severity**, other issues and performance problems, and then **fixes them**. Branch `phase-3/code-review`, PR #2.
+The agent acts as a **senior software developer** reviewing the whole codebase, as if it were someone else's code before a release. It looks for bugs of **every severity**, other issues and performance problems, and then **fixes them**. Branch `phase-3/code-review`.
 
 1. **Baseline first.** Run `npm install`, `npm run typecheck`, `npm test`, `npm run build` and `npm audit`. Record the test count, build time, bundle sizes (`apps/viewer/dist`, `packages/embed/dist/app-lens.js`) and generation time for a large manifest (high `mock` counts). The same numbers are measured again at the end.
 2. **Read every file** in `packages/core`, `packages/ui`, `packages/embed`, `packages/cli` and `apps/viewer`. Use this checklist:

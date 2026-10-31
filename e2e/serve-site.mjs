@@ -11,7 +11,7 @@ const out = join(root, 'dist/e2e-site');
 execFileSync(process.execPath, [cli, 'build', join(root, 'samples/taskpilot.app-lens.json'), '--out', out, '--force'], { stdio: 'inherit' });
 
 writeFileSync(join(out, 'embed.html'), `<!doctype html>
-<html><head><title>Embed</title><script src="app-lens.js"></script></head>
+<html lang="en"><head><title>Embed</title><script src="app-lens.js"></script></head>
 <body>
 <app-lens id="inline" tab="features">
 <script type="application/json">{ "app": { "name": "InlineApp" }, "features": [{ "id": "one", "title": "Inline feature" }] }</script>

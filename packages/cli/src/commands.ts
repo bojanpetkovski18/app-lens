@@ -26,7 +26,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 // Inline styles are needed for runtime theming. Scripts only ever come from the site itself.
-const CONTENT_SECURITY_POLICY = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'";
+const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'";
 
 interface Options {
   out?: string;
@@ -72,7 +72,7 @@ function assetRoot(): string {
 export function readManifestFile(file: string): unknown {
   if (!existsSync(file)) throw new CliError(`File not found: ${file}`);
   if (statSync(file).isDirectory()) throw new CliError(`${file} is a folder. Pass a manifest file.`);
-  const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
+  const text = readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
   try {
     return JSON.parse(text);
   } catch (error) {

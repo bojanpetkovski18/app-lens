@@ -1,6 +1,6 @@
 .al-root.al-studio { display: flex; flex-direction: column; height: 100vh; min-height: 0; overflow: hidden; }
 .al-root .al-studio-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--al-surface); border-bottom: 1px solid var(--al-border); }
-.al-root .al-studio-message { padding: 6px 16px; background: var(--al-info-bg); color: var(--al-info-text); }
+.al-root .al-studio-message { padding: 6px 16px; overflow-wrap: anywhere; background: var(--al-info-bg); color: var(--al-info-text); }
 .al-root .al-studio-review { max-height: 40vh; margin: 10px 16px 0; overflow: auto; }
 .al-root .al-studio-main { flex: 1; display: grid; grid-template-columns: minmax(340px, 480px) minmax(0, 1fr); min-height: 0; }
 .al-root .al-studio-editor { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: auto; border-right: 1px solid var(--al-border); }

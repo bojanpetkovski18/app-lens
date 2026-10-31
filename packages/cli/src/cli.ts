@@ -3,7 +3,7 @@ import { attach } from './intake/attach';
 import { diff, exportManifest, ingest, lint } from './smarts';
 import { studio } from './studio';
 
-const VERSION = '0.2.0';
+const VERSION = '1.0.0';
 
 const HELP = `AppLens ${VERSION}: interactive showcases for your apps, built from one manifest file.
 

@@ -105,7 +105,7 @@ export function DataExplorer({ manifest, dataset, focus, onFocus, onNewData }: D
           </div>
         </div>
 
-        <div className="al-table-wrap">
+        <div className="al-table-wrap" role="region" aria-label="Records" tabIndex={0}>
           <table className="al-table al-table-hover">
             <thead>
               <tr>{columns.map(([name]) => <th key={name} scope="col">{humanize(name)}</th>)}</tr>

@@ -32,7 +32,7 @@ function readText(file: string): string {
   const stat = statSync(file);
   if (stat.isDirectory()) throw new CliError(`${file} is a folder. Pass a file.`);
   if (stat.size > MAX_INPUT_BYTES) throw new CliError(`${file} is larger than 10 MB.`);
-  return readFileSync(file, 'utf8').replace(/^﻿/, '');
+  return readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
 }
 
 function validManifest(file: string): Manifest {

@@ -24,6 +24,8 @@ export function gitignoreMatcher(text: string): (path: string) => boolean {
     .slice(0, 500)
     .map((line) => {
       const anchored = line.replace(/\/$/, '').includes('/');
+      // \u0000 holds the place of ** while single * is expanded.
+      // eslint-disable-next-line no-control-regex
       const body = line.replace(/^\//, '').replace(/\/$/, '').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\u0000/g, '.*');
       return new RegExp(anchored ? `^${body}(/|$)` : `(^|/)${body}(/|$)`);
     });
@@ -36,7 +38,7 @@ function readLimited(path: string, limit: number): string | null {
     const buffer = Buffer.alloc(limit);
     const bytes = readSync(descriptor, buffer, 0, limit, 0);
     const content = buffer.subarray(0, bytes);
-    return content.includes(0) ? null : content.toString('utf8').replace(/^﻿/, '');
+    return content.includes(0) ? null : content.toString('utf8').replace(/^\uFEFF/, '');
   } finally {
     closeSync(descriptor);
   }

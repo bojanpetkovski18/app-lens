@@ -5,18 +5,18 @@ This file records **everything that has been built and changed in AppLens so far
 - [HANDOFF.md](HANDOFF.md) says **what to do next**: the GitHub workflow, the phase plan and the rules.
 - This file says **what already exists, how it was built, and how to rebuild it**.
 
-Last updated: 2026-10-30, after **Phase 6** (see Part A).
+Last updated: 2026-10-31, after the pre-release work (see Part A).
 
 ---
 
 ## How to use this file
 
-1. **Picking the project up (normal case):** you do not need to rebuild anything. Copy the project, then follow [HANDOFF.md](HANDOFF.md) section 0. This file goes into **PR #1** together with the code.
+1. **Picking the project up (normal case):** you do not need to rebuild anything. Clone the project, then follow [HANDOFF.md](HANDOFF.md) section 0.
 2. **Rebuilding from scratch** (e.g. lost files, or a clean re-implementation):
    - Follow HANDOFF section 0.1 and 0.2 first: personal git identity and an empty GitHub repo.
-   - Create `main` with an empty commit and the branch `phase-1-2/foundation`, as in HANDOFF section 0.3.
+   - Create `main` with an empty commit, then a `dev` branch from it.
    - Work through **Part B** below, step by step, in order. Commit after each step (`chore:`, `feat:`, `test:`).
-   - Run the checks in **Part C**. All must pass before you open PR #1.
+   - Run the checks in **Part C**. All must pass before you open the first PR.
    - Then continue with **Phase 3** in HANDOFF section 10, on a new branch and a new PR.
 3. **Rules that apply throughout** (from HANDOFF sections 8 and 11):
    - Strict TypeScript everywhere. `packages/core/src` stays pure: no DOM or Node APIs.
@@ -89,7 +89,7 @@ All of these were made in one working session, in this order:
 
 ## A.4 Phase 3: Code review (done)
 
-The review started with a baseline, and each confirmed bug got a regression test that failed before its fix. Findings and before/after numbers are in PR #2. Changes to the behaviour described in Part B:
+The review started with a baseline, and each confirmed bug got a regression test that failed before its fix. The fixes are in the history of `phase-3/code-review`. Changes to the behaviour described in Part B:
 
 - **Tooling:** Node 20.19+ (CI on 22), vitest 4.1, `@types/node` 22, esbuild target `node20`, GitHub Actions CI, Playwright e2e in `e2e/`, `scripts/measure.mjs`, UI and embed unit tests with jsdom.
 - **Core:** `isoDate` rejects dates that don't exist. Date offsets are limited to ±100000 days and numbers to the safe integer range. `ownValue` replaces direct lookups of untrusted names. Scenario values are checked against the field kind. Upper-case http schemes are accepted, and generated numbers are never `-0`.
@@ -131,6 +131,15 @@ Elsewhere:
 - CLI: `studio.ts` (`app-lens studio`, local API), `ai.ts` (`aiDraft` with the official SDK), and `ingest --ai`. `serveStatic` takes an API handler. The build copies `apps/studio/dist` to `dist/studio`.
 - `.github/workflows/pages.yml` publishes the samples and Studio.
 
+## A.8 Pre-release work (2026-10-31)
+
+- Added a `dev` branch and merged every phase into it. `dev` is now the default branch, CI runs on pushes to it, and new work uses `#00nn-...` branches.
+- Added `CLAUDE.md`, `PROGRESS.md`, `DECISIONS.md` and `docs/ARCHITECTURE.md`, plus an AI-assistance note in the README. HANDOFF section 0 now describes the workflow in use.
+- Added `e2e/audit.spec.ts` and `docs/AUDIT.md`. Fixes: zod runs jitless, built sites allow no inline styles, `useDialog` handles dialog focus, table wrappers can be scrolled by keyboard, and long saved paths wrap.
+- Set every package to version 1.0.0. Part B shows the 0.2.0 it was built at.
+- `fetchManifest` in `@app-lens/ui` loads manifests for the viewer and web component, with a 5 MB limit enforced while reading.
+- Pinned CI actions to commit SHAs and direct dependencies to exact versions. CI gained ESLint, a gitleaks scan of the full history, actionlint and editorconfig-checker.
+
 ---
 
 # Part B: Rebuild from scratch
@@ -160,7 +169,7 @@ Follow the steps in order. File paths are relative to the repo root.
     "app-lens": "node packages/cli/dist/cli.js"
   },
   "devDependencies": { "@types/node": "^18.19.64", "typescript": "^5.6.3" },
-  "overrides": { "vite": "^6.4.5" }
+  "overrides": { "vite": "6.4.5" }
 }
 ```
 The workspace order matters: core, ui, embed, viewer, cli. The build order is **viewer, then embed, then cli**, because the CLI build copies the other two outputs.
@@ -740,7 +749,7 @@ Both samples are fictional and say so in their description. The viewer bundles e
 `apps/viewer/package.json`:
 - `name` is `@app-lens/viewer`, private, `type: module`.
 - Scripts: `dev` (`vite`), `build` (`tsc --noEmit && vite build`), `preview`, `typecheck`.
-- Dependencies: core, ui, `react` and `react-dom` `^18.3.1`. Dev dependencies: React types, `@vitejs/plugin-react ^4.7.0`, `vite ^6.4.5`.
+- Dependencies: core, ui, `react` and `react-dom` `^18.3.1`. Dev dependencies: React types, `@vitejs/plugin-react 4.7.0`, `vite 6.4.5`. Part B shows the original `^` ranges for other packages; `package.json` now holds exact versions.
 
 `tsconfig.json`: the DOM libs, `jsx: react-jsx`, `types: ["vite/client", "node"]`, includes `src` and `vite.config.ts`.
 
@@ -922,7 +931,7 @@ Demo page:
 
 # Part C: Verify the rebuild
 
-Run these from the repo root. All must pass before PR #1 is opened (HANDOFF section 0.4).
+Run these from the repo root. All must pass before the first PR is opened (HANDOFF section 0.2).
 
 ```bash
 npm install
@@ -946,7 +955,7 @@ Manual checks:
 3. `app-lens build samples/taskpilot.app-lens.json --out tmp-site`, then `app-lens preview tmp-site`. The page title is `TaskPilot · AppLens`. Building again into a non-empty unrelated folder must be refused.
 4. The embed demo page shows TaskPilot on Walkthroughs and CafeQueue in dark mode with the custom colours.
 
-Then commit, push and open **PR #1** as described in HANDOFF section 0.3. After it is merged, continue with **Phase 3: Code review** (HANDOFF section 10) on the branch `phase-3/code-review`.
+Then commit, push and open a PR into `dev` as described in HANDOFF section 0.2.
 
 ---
 

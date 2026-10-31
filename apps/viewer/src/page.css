@@ -1,0 +1,4 @@
+/* Kept in a stylesheet because built sites run under a policy with no inline styles. */
+body {
+  margin: 0;
+}

@@ -105,6 +105,16 @@ describe('<app-lens>', () => {
     await waitFor(() => expect(text(el)).toContain('Only http(s)'));
   });
 
+  it('reports a manifest that is too large', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { headers: { 'content-length': String(6 * 1024 * 1024) } })));
+    const element = document.createElement('app-lens');
+    element.setAttribute('src', 'huge.json');
+    const failed = new Promise<CustomEvent>((resolve) => element.addEventListener('app-lens:error', (event) => resolve(event as CustomEvent)));
+    document.body.append(element);
+    expect((await failed).detail.message).toMatch(/too large/);
+    element.remove();
+  });
+
   it('aborts the previous fetch when src changes', async () => {
     const signals: AbortSignal[] = [];
     vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {

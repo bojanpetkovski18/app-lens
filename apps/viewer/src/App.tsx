@@ -1,5 +1,5 @@
 import { AppLensView, Frame, sanitizeTheme, TABS, type AppLensEvent, type Tab } from '@app-lens/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { SourcePicker } from './components/SourcePicker';
 import { pinnedManifestUrl, resolveManifestUrl, sampleSources, sourceFromUrl, type ManifestSource } from './sources';
 
@@ -28,19 +28,25 @@ function forwardEvent(event: AppLensEvent): void {
   if (embedded && window.parent !== window) window.parent.postMessage({ type: 'app-lens:event', event }, '*');
 }
 
+// Loaded on demand because it pulls in a YAML parser.
+const AttachDialog = lazy(() => import('./components/AttachDialog'));
+
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; manifest: unknown };
 
 export function App() {
   const { sources, pinned, invalidUrl } = useMemo(resolveSources, []);
   const [activeKey, setActiveKey] = useState(() => (pinned ? sources[0]?.key : params.get('source') ?? sources[0]?.key) ?? '');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [attaching, setAttaching] = useState(false);
+  const [attached, setAttached] = useState<ManifestSource | null>(null);
+  const allSources = useMemo(() => (attached ? [...sources, attached] : sources), [sources, attached]);
 
   useEffect(() => {
     if (invalidUrl) {
       setState({ status: 'error', message: `Only http(s) manifest URLs are allowed: ${invalidUrl}` });
       return;
     }
-    const source = sources.find((item) => item.key === activeKey);
+    const source = allSources.find((item) => item.key === activeKey);
     if (!source) {
       setState(activeKey ? { status: 'error', message: `Unknown manifest source "${activeKey}".` } : { status: 'loading' });
       return;
@@ -56,7 +62,7 @@ export function App() {
       },
     );
     return () => controller.abort();
-  }, [activeKey, sources, invalidUrl]);
+  }, [activeKey, allSources, invalidUrl]);
 
   useEffect(() => {
     if (!embedded || window.parent === window) return;
@@ -73,12 +79,31 @@ export function App() {
     window.history.replaceState(null, '', url);
   };
 
-  const toolbar = !embedded && !pinned && sources.length > 1
-    ? <SourcePicker sources={sources} value={activeKey} onChange={selectSource} />
-    : undefined;
+  const toolbar = !embedded && !pinned ? (
+    <div className="al-row">
+      {allSources.length > 1 ? <SourcePicker sources={allSources} value={activeKey} onChange={selectSource} /> : null}
+      <button type="button" className="al-btn" onClick={() => setAttaching(true)}>Attach project</button>
+    </div>
+  ) : undefined;
+
+  const dialog = attaching ? (
+    <Suspense fallback={null}>
+      <AttachDialog
+        onClose={() => setAttaching(false)}
+        onDraft={(label, manifest) => {
+          const key = `attached:${Date.now()}`;
+          setAttached({ key, label, group: 'Attached', load: () => Promise.resolve(manifest) });
+          setActiveKey(key);
+          setAttaching(false);
+        }}
+      />
+    </Suspense>
+  ) : null;
 
   if (state.status === 'ready') {
     return (
+      <>
+      {dialog}
       <AppLensView
         key={activeKey}
         manifest={state.manifest}
@@ -89,6 +114,7 @@ export function App() {
         initialPersona={initialPersona}
         onEvent={forwardEvent}
       />
+      </>
     );
   }
   return (

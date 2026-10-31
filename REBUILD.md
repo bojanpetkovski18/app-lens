@@ -5,7 +5,7 @@ This file records **everything that has been built and changed in AppLens so far
 - [HANDOFF.md](HANDOFF.md) says **what to do next**: the GitHub workflow, the phase plan and the rules.
 - This file says **what already exists, how it was built, and how to rebuild it**.
 
-Last updated: 2026-10-30, after **Phase 4** (see Part A).
+Last updated: 2026-10-30, after **Phase 5** (see Part A).
 
 ---
 
@@ -115,6 +115,13 @@ Elsewhere:
 - Embed: re-dispatches interactions as `app-lens:event`. Viewer: forwards them to an iframe parent.
 - CLI: `smarts.ts` with `ingest`, `export`, `lint` and `diff`; `preview --watch` with live reload over server-sent events. The `yaml` dependency is bundled, so the esbuild banner adds a `require` created with `createRequire`.
 - `e2e/cli.spec.ts` runs the built binary, because unit tests import the sources and cannot catch bundling problems.
+
+## A.6 Phase 5: Project intake (done)
+
+- Core `projectfiles.ts`: `shouldReadPath` (shared by the CLI and the browser), `signalsFromFiles` (`package.json`, README, OpenAPI, Prisma, routes, forms, theme colours, role enums as personas, known dependencies as integrations) and `signalsFromPages`, which keeps structure only and drops anything that looks personal.
+- CLI `intake/`: `folder.ts` (read-only walk, `.gitignore`, limits, no symlinks), `github.ts` (strict URL parsing, tarball through the REST API, hand-written guarded tar extraction, slash-containing branches), `net.ts` (SSRF guard, `safeFetch`), `site.ts` (`robots.txt`, sitemap, `htmlparser2` page parsing), `attach.ts` (source detection, third-party rules).
+- `build` refuses a manifest with `draft.thirdParty`. `drafts/` is gitignored.
+- Viewer: *Attach project* dialog, loaded lazily because of the YAML parser, and `attach-endpoint.ts`, a dev-only Vite plugin that shells out to the built CLI with no shell and checks `Host`, `Origin` and content type.
 
 ---
 
@@ -910,7 +917,7 @@ Run these from the repo root. All must pass before PR #1 is opened (HANDOFF sect
 ```bash
 npm install
 npm run typecheck      # every package, 0 errors
-npm test               # 173 tests: 90 core, 38 CLI, 30 UI, 12 embed, 3 viewer
+npm test               # 279 tests: 118 core, 110 CLI, 30 UI, 12 embed, 9 viewer
 npm run build          # viewer -> embed -> cli; Rollup may print zod annotation warnings, which are harmless
 npm run app-lens -- --help
 npm run app-lens -- validate samples/invoiceflow.app-lens.json

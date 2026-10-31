@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-30, after **Phase 4**.
+Last updated: 2026-10-30, after **Phase 5**.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -111,10 +111,10 @@ It is a personal project. It must stay **independent of any employer or third-pa
 | 2. Distribution | `@app-lens/ui` shared package, theming (colours, radius, font, light/dark/auto), embedded mode, `<app-lens>` web component, iframe mode, standalone sites, CLI (`init`, `validate`, `build`, `preview`, `schema`), JSON Schema for editors, **product demo video** with a research-progress step | #1 | Done |
 | 3. Code review | Senior-developer review of the whole codebase; find and fix bugs of every severity, issues and performance problems; Node 22, vitest 4, CI | #2 | Done |
 | 4. Smarts | Import from OpenAPI, Prisma and README; PDF and Markdown export; analytics hooks; real video export; plus `lint`, `diff`, CSV/JSON record export and `preview --watch` | #3 | Done |
-| 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Later |
+| 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | #4 | Done |
 | 6. Studio | Visual manifest editor with live preview, optional AI drafting | #5 | Later |
 
-Verified at the end of Phase 4: 173 unit tests pass (90 core, 38 CLI, 30 UI, 12 embed, 3 viewer), 17 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean.
+Verified at the end of Phase 5: 279 unit tests pass (118 core, 110 CLI, 30 UI, 12 embed, 9 viewer), 20 Playwright e2e tests pass, typecheck passes in every package, `npm run build` succeeds and `npm audit` is clean. Also run for real against a folder, a public GitHub repo and a live website.
 
 ## 3. Requirements and quick start
 
@@ -252,6 +252,19 @@ app-lens ingest openapi spec.yaml --out draft.json # also: prisma, readme
 app-lens export pdf app-lens.json                  # also: md, with a Mermaid data model
 ```
 
+**Project intake.** One command, three sources, detected automatically:
+
+```bash
+app-lens attach ./my-project
+app-lens attach https://github.com/owner/repo/tree/branch/folder
+app-lens attach www.example.com
+# --out --report --max-files --max-pages --dry-run --json
+# --own        this URL or repo is mine, so no third-party marking
+# --third-party  this folder is someone else's
+```
+
+The output is a validated draft plus `app-lens.intake.json`, which lists each item with its evidence and a confidence level. URLs and repos count as third-party unless you pass `--own`: their drafts go to the gitignored `drafts/` folder, carry a not-affiliated notice and a `draft` marker, and `build` refuses them. The viewer's *Attach project* dialog reads folders entirely in the browser. GitHub links and websites need the dev server's `/__app-lens/attach` endpoint, or the CLI.
+
 **Analytics.** Nothing is tracked by default. Pass `onEvent` to `AppLensView`, listen for the `app-lens:event` DOM event on the web component, or listen for `{ type: 'app-lens:event', event }` messages from an iframe. Events: `tab_viewed`, `persona_changed`, `feature_viewed`, `scenario_completed`, `demo_completed`.
 
 ## 7. Product demo (Walkthroughs → "Product demo")
@@ -281,6 +294,9 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
   - Manifest names resolve through own properties only, so `constructor` never reaches `Object.prototype`.
   - Built sites ship a content security policy, and a pinned site ignores `?manifest=` so a link cannot spoof its content.
   - The preview server checks the `Host` header to block DNS rebinding.
+  - Intake never runs project code, skips secrets and key files, and does not follow symlinks.
+  - Website intake blocks non-public addresses on every redirect and connects to the checked address, so a second DNS answer cannot change the target. It respects `robots.txt` and collects page structure only, never body text.
+  - GitHub tarballs are parsed by hand: traversal paths abort the extraction, links are never created, and sizes are capped. `GITHUB_TOKEN` is only sent to the GitHub API.
 
 ## 9. Known issues and caveats
 
@@ -290,6 +306,8 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 - `app-lens:resize` posts to `'*'` on purpose: the viewer can't know its embedder, and the message only carries a height.
 - Validation runs in two stages. If the schema stage fails, reference checks (unknown refs, personas) are only reported after those errors are fixed.
 - The on-screen demo is a rendered animation. "Download video" records a separate canvas render to WebM in real time, so it takes as long as the demo. MP4 is not produced.
+- Sites that render everything with JavaScript give thin drafts, because intake never runs scripts. A headless mode could come later behind a flag.
+- A folder with a plain README and no routes, specs or schemas gives a thin draft. Monorepos only read the root README and `package.json`.
 - PDF export uses the built-in Helvetica font, so text outside Latin is transliterated or replaced with `?`.
 - The `app-lens.mjs` (ES) embed build is not minified; `app-lens.js` (IIFE) is.
 - The viewer bundles samples at build time, so new samples need a rebuild.

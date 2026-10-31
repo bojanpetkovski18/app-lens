@@ -12,6 +12,11 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
+      command: 'node packages/cli/dist/cli.js studio --port 4412',
+      url: 'http://127.0.0.1:4412',
+      reuseExistingServer: false,
+    },
+    {
       command: 'node e2e/serve-site.mjs',
       url: 'http://127.0.0.1:4411',
       reuseExistingServer: false,

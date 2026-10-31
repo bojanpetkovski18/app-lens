@@ -14,8 +14,7 @@
     "@app-lens/core": "*",
     "@app-lens/ui": "*",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "yaml": "^2.6.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

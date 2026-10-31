@@ -1,7 +1,7 @@
 import { manifestJsonSchema, parseManifest, type Manifest } from '@app-lens/core';
 import { createHash } from 'node:crypto';
 import { cpSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from 'node:fs';
-import { createServer, type Server, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +55,7 @@ export function parseCliArgs(args: string[]) {
         own: { type: 'boolean' },
         'third-party': { type: 'boolean' },
         json: { type: 'boolean' },
+        ai: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
@@ -203,7 +204,9 @@ export interface LiveReload {
 }
 
 /** Serves a folder. With `live`, pages reload when the returned handle's `reload` is called. */
-export function serveStatic(root: string, port: number, live?: (handle: LiveReload) => void): Promise<Server> {
+type ApiHandler = (request: IncomingMessage, response: ServerResponse) => boolean;
+
+export function serveStatic(root: string, port: number, live?: (handle: LiveReload) => void, api?: ApiHandler): Promise<Server> {
   const clients = new Set<ServerResponse>();
   live?.({ reload: () => clients.forEach((client) => client.write('data: reload\n\n')) });
 
@@ -213,6 +216,7 @@ export function serveStatic(root: string, port: number, live?: (handle: LiveRelo
       response.end('Forbidden');
       return;
     }
+    if (api?.(request, response)) return;
     const path = (request.url ?? '/').split('?')[0];
     if (live && path === LIVE_PATH) {
       response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });

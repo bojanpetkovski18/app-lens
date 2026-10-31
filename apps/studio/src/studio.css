@@ -1,0 +1,26 @@
+.al-root.al-studio { display: flex; flex-direction: column; height: 100vh; min-height: 0; overflow: hidden; }
+.al-root .al-studio-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--al-surface); border-bottom: 1px solid var(--al-border); }
+.al-root .al-studio-message { padding: 6px 16px; background: var(--al-info-bg); color: var(--al-info-text); }
+.al-root .al-studio-review { max-height: 40vh; margin: 10px 16px 0; overflow: auto; }
+.al-root .al-studio-main { flex: 1; display: grid; grid-template-columns: minmax(340px, 480px) minmax(0, 1fr); min-height: 0; }
+.al-root .al-studio-editor { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; overflow: auto; border-right: 1px solid var(--al-border); }
+.al-root .al-studio-preview { min-width: 0; overflow: auto; background: var(--al-bg); }
+.al-root .al-studio-issues .al-alert { margin: 0; max-height: 200px; overflow: auto; }
+.al-root .al-studio-json { flex: 1; min-height: 480px; width: 100%; padding: 10px; border: 1px solid var(--al-border); border-radius: calc(var(--al-radius) - 3px); background: var(--al-surface); color: var(--al-text); font: 13px/18px ui-monospace, SFMono-Regular, Consolas, monospace; resize: none; white-space: pre; }
+.al-root .al-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; color: var(--al-muted); font-size: 13px; }
+.al-root .al-field .al-input { width: 100%; color: var(--al-text); font-size: 14px; }
+.al-root .al-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.al-root .al-field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.al-root .al-field-row .al-input { width: 100%; padding: 5px 7px; font-size: 13px; }
+.al-root .al-form-section summary { display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.al-root .al-form-section[open] summary { margin-bottom: 10px; }
+.al-root .al-form-item { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--al-border); }
+.al-root .al-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 0; border: 0; font-size: 13px; }
+.al-root .al-checks legend { padding: 0; color: var(--al-muted); }
+.al-root .al-checks label { display: inline-flex; align-items: center; gap: 4px; }
+
+@media (max-width: 900px) {
+  .al-root.al-studio { height: auto; overflow: visible; }
+  .al-root .al-studio-main { grid-template-columns: minmax(0, 1fr); }
+  .al-root .al-studio-editor { border-right: 0; border-bottom: 1px solid var(--al-border); }
+}

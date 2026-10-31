@@ -32,28 +32,28 @@ components:
 `;
 
 describe('ingest', () => {
-  it('drafts a valid manifest and report from YAML', () => {
+  it('drafts a valid manifest and report from YAML', async () => {
     quiet();
     writeFileSync(path('spec.yaml'), YAML_SPEC);
-    ingest('openapi', path('spec.yaml'), { out: path('draft.json'), report: path('report.json') });
+    await ingest('openapi', path('spec.yaml'), { out: path('draft.json'), report: path('report.json') });
     const manifest = JSON.parse(readFileSync(path('draft.json'), 'utf8'));
     expect(parseManifest(manifest).ok).toBe(true);
     expect(manifest.app.name).toBe('Yaml Store');
     expect(JSON.parse(readFileSync(path('report.json'), 'utf8')).items[0]).toMatchObject({ kind: 'entity', name: 'Item' });
   });
 
-  it('refuses to overwrite and rejects unknown types', () => {
+  it('refuses to overwrite and rejects unknown types', async () => {
     writeFileSync(path('taken.json'), '{}');
     writeFileSync(path('spec2.yaml'), YAML_SPEC);
-    expect(() => ingest('openapi', path('spec2.yaml'), { out: path('taken.json') })).toThrow(CliError);
-    expect(() => ingest('graphql', path('spec2.yaml'), { out: path('other.json') })).toThrow('Unknown ingest type');
+    await expect(ingest('openapi', path('spec2.yaml'), { out: path('taken.json') })).rejects.toThrow(CliError);
+    await expect(ingest('graphql', path('spec2.yaml'), { out: path('other.json') })).rejects.toThrow('Unknown ingest type');
   });
 
-  it('reports broken specs as CLI errors', () => {
+  it('reports broken specs as CLI errors', async () => {
     writeFileSync(path('bad.yaml'), 'a: [unclosed');
-    expect(() => ingest('openapi', path('bad.yaml'), { out: path('x.json') })).toThrow(CliError);
+    await expect(ingest('openapi', path('bad.yaml'), { out: path('x.json') })).rejects.toThrow(CliError);
     writeFileSync(path('other.json'), '{"not":"openapi"}');
-    expect(() => ingest('openapi', path('other.json'), { out: path('y.json') })).toThrow(CliError);
+    await expect(ingest('openapi', path('other.json'), { out: path('y.json') })).rejects.toThrow(CliError);
   });
 
   it('caps YAML alias expansion', () => {

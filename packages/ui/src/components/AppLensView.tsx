@@ -24,9 +24,11 @@ export interface AppLensViewProps {
   initialPersona?: string;
   /** Called for each interaction. AppLens tracks nothing unless a host passes this. */
   onEvent?: (event: AppLensEvent) => void;
+  /** Keeps tab and persona across manifest changes, for live previews of the same document. */
+  stateKey?: string;
 }
 
-export function AppLensView({ manifest, theme, embedded, toolbar, initialTab, initialPersona, onEvent }: AppLensViewProps) {
+export function AppLensView({ manifest, theme, embedded, toolbar, initialTab, initialPersona, onEvent, stateKey }: AppLensViewProps) {
   const result = useMemo(() => parseManifest(manifest), [manifest]);
   if (!result.ok) {
     return (
@@ -38,7 +40,7 @@ export function AppLensView({ manifest, theme, embedded, toolbar, initialTab, in
   return (
     <AnalyticsProvider onEvent={onEvent}>
       <Showcase
-        key={keyOf(result.manifest)}
+        key={stateKey ?? keyOf(result.manifest)}
         manifest={result.manifest}
         theme={theme}
         embedded={embedded}

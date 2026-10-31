@@ -10,4 +10,5 @@ export * from './projectfiles';
 export * from './rng';
 export * from './scenario';
 export * from './schema';
+export * from './template';
 export * from './validate';

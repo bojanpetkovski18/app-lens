@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@app-lens/core": "*"
+    "@app-lens/core": "*",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

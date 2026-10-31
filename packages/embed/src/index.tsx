@@ -1,5 +1,5 @@
 import { parseManifest } from '@app-lens/core';
-import { AppLensView, Frame, sanitizeTheme, TABS, type Tab } from '@app-lens/ui';
+import { AppLensView, Frame, sanitizeTheme, TABS, type AppLensEvent, type Tab } from '@app-lens/ui';
 import styles from '@app-lens/ui/styles.css?inline';
 import { createRoot, type Root } from 'react-dom/client';
 
@@ -158,6 +158,8 @@ class AppLensElement extends HTMLElement {
     }
   }
 
+  #onEvent = (event: AppLensEvent): void => this.#emit('app-lens:event', event);
+
   #emit(type: string, detail?: unknown): void {
     this.dispatchEvent(new CustomEvent(type, { bubbles: true, composed: true, detail }));
   }
@@ -176,7 +178,7 @@ class AppLensElement extends HTMLElement {
     const persona = this.getAttribute('persona') ?? undefined;
 
     if (this.#state.status === 'ready') {
-      this.#root.render(<AppLensView manifest={this.#manifest} theme={theme} embedded initialTab={tab} initialPersona={persona} />);
+      this.#root.render(<AppLensView manifest={this.#manifest} theme={theme} embedded initialTab={tab} initialPersona={persona} onEvent={this.#onEvent} />);
     } else {
       this.#root.render(
         <Frame overrides={theme} embedded>

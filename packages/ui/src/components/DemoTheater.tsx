@@ -1,6 +1,8 @@
 import { buildDemo, sceneAt, type Dataset, type DemoScript, type Manifest } from '@app-lens/core';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { initials, mediaMatches, slug } from '../util';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useTrack } from '../analytics';
+import { canRecordVideo, recordDemo } from '../video';
+import { downloadBlob, initials, mediaMatches, messageOf, slug } from '../util';
 import { DemoStage, sceneCaption } from './DemoScenes';
 
 interface DemoTheaterProps {
@@ -111,6 +113,66 @@ function Research({ stages, onDone }: { stages: { label: string; detail: string 
   );
 }
 
+interface VideoExportProps {
+  manifest: Manifest;
+  script: DemoScript;
+  rootRef: RefObject<HTMLElement>;
+}
+
+function VideoExport({ manifest, script, rootRef }: VideoExportProps) {
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const controller = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controller.current?.abort(), []);
+  if (!canRecordVideo()) return null;
+
+  const start = async () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const styles = getComputedStyle(root);
+    const color = (name: string, fallback: string) => styles.getPropertyValue(name).trim() || fallback;
+    controller.current = new AbortController();
+    setError(null);
+    setProgress(0);
+    try {
+      const blob = await recordDemo(manifest, script, {
+        colors: {
+          primary: color('--al-primary', '#4f46e5'),
+          accent: color('--al-accent', '#0ea5e9'),
+          background: color('--al-bg', '#f5f6fa'),
+          surface: color('--al-surface', '#ffffff'),
+          border: color('--al-border', '#e3e6ee'),
+          text: color('--al-text', '#1b2130'),
+          muted: color('--al-muted', '#657085'),
+        },
+        signal: controller.current.signal,
+        onProgress: setProgress,
+      });
+      downloadBlob(blob, `${slug(manifest.app.name) || 'app'}-demo.webm`);
+    } catch (reason) {
+      if (!controller.current?.signal.aborted) setError(messageOf(reason));
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  if (progress !== null) {
+    return (
+      <span className="al-row">
+        <span className="al-muted al-num" role="status">Recording {Math.round(progress * 100)}%</span>
+        <button type="button" className="al-link" onClick={() => controller.current?.abort()}>Cancel</button>
+      </span>
+    );
+  }
+  return (
+    <span className="al-row">
+      {error ? <span role="alert">{error}</span> : null}
+      <button type="button" className="al-link" onClick={() => void start()}>Download video (WebM)</button>
+    </span>
+  );
+}
+
 interface ChapterListProps {
   chapters: { id: string; title: string; start: number }[];
   current: number;
@@ -156,9 +218,13 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
     return () => cancelAnimationFrame(frame);
   }, [playing, script.durationMs]);
 
+  const track = useTrack();
+  const finished = elapsed >= script.durationMs;
   useEffect(() => {
-    if (elapsed >= script.durationMs) setPlaying(false);
-  }, [elapsed, script.durationMs]);
+    if (!finished) return;
+    setPlaying(false);
+    track({ type: 'demo_completed' });
+  }, [finished, track]);
 
   useEffect(() => {
     // Inside a shadow root, document.fullscreenElement is the host, not the player.
@@ -255,7 +321,10 @@ function DemoVideo({ manifest, script, onResearchAgain }: DemoVideoProps) {
       </section>
       <div className="al-toolbar">
         <ChapterList chapters={chapters} current={position.index} onSeek={seek} />
-        <button type="button" className="al-link" onClick={onResearchAgain}>Research again</button>
+        <div className="al-row">
+          <VideoExport manifest={manifest} script={script} rootRef={rootRef} />
+          <button type="button" className="al-link" onClick={onResearchAgain}>Research again</button>
+        </div>
       </div>
     </div>
   );

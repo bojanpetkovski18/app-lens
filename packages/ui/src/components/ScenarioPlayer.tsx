@@ -1,5 +1,6 @@
 import { displayOf, getEntityFields, runScenario, type Dataset, type Manifest, type Scenario, type ScenarioStep } from '@app-lens/core';
 import { useEffect, useMemo, useState } from 'react';
+import { useTrack } from '../analytics';
 import { humanize, isScenarioForPersona } from '../util';
 import { DemoTheater } from './DemoTheater';
 import { FieldValue } from './FieldValue';
@@ -75,6 +76,11 @@ function Player({ manifest, dataset, scenario, seed }: PlayerProps) {
   const entity = manifest.entities[scenario.entity];
   const fields = entity ? getEntityFields(entity) : [];
   const atEnd = position >= last;
+  const track = useTrack();
+
+  useEffect(() => {
+    if (position === last) track({ type: 'scenario_completed', scenario: scenario.id });
+  }, [position, last, scenario.id, track]);
 
   useEffect(() => {
     if (!playing) return;

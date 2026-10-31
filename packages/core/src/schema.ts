@@ -89,6 +89,9 @@ const featureSchema = z
   })
   .strict();
 
+/** Marks a manifest drafted from a project the user does not own. Such drafts never reach a build. */
+const draftSchema = z.object({ thirdParty: z.boolean(), source: text(500) }).strict();
+
 const narration = text(500);
 const stepSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('create'), narration, values: valueMap.optional() }).strict(),
@@ -119,6 +122,7 @@ export const manifestSchema = z
     manifestVersion: z.literal(1).default(1),
     app: appSchema,
     attribution: attributionSchema.optional(),
+    draft: draftSchema.optional(),
     personas: z.array(personaSchema).max(12).default([]),
     entities: z
       .record(entityName, entitySchema)

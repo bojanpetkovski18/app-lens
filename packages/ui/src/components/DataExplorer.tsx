@@ -1,6 +1,6 @@
-import { displayOf, getEntityFields, type Dataset, type Manifest } from '@app-lens/core';
+import { displayOf, getEntityFields, recordsToCsv, type Dataset, type Manifest } from '@app-lens/core';
 import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import { humanize } from '../util';
+import { downloadBlob, humanize, slug } from '../util';
 import { FieldValue } from './FieldValue';
 
 export interface DataFocus {
@@ -58,6 +58,11 @@ export function DataExplorer({ manifest, dataset, focus, onFocus, onNewData }: D
   const start = Math.min(page, lastPage) * PAGE_SIZE;
   const visible = filtered.slice(start, start + PAGE_SIZE);
 
+  const download = (format: 'csv' | 'json') => {
+    const content = format === 'csv' ? recordsToCsv(filtered) : `${JSON.stringify(filtered, null, 2)}\n`;
+    downloadBlob(new Blob([content], { type: format === 'csv' ? 'text/csv' : 'application/json' }), `${slug(entityName) || 'records'}.${format}`);
+  };
+
   const onRowKey = (event: KeyboardEvent<HTMLTableRowElement>, id: string) => {
     if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
     event.preventDefault();
@@ -95,6 +100,8 @@ export function DataExplorer({ manifest, dataset, focus, onFocus, onNewData }: D
               }}
             />
             <button type="button" className="al-btn" onClick={onNewData}>New sample data</button>
+            <button type="button" className="al-btn al-btn-ghost" onClick={() => download('csv')}>CSV</button>
+            <button type="button" className="al-btn al-btn-ghost" onClick={() => download('json')}>JSON</button>
           </div>
         </div>
 

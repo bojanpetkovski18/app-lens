@@ -1,4 +1,4 @@
-import { AppLensView, Frame, sanitizeTheme, TABS, type Tab } from '@app-lens/ui';
+import { AppLensView, Frame, sanitizeTheme, TABS, type AppLensEvent, type Tab } from '@app-lens/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { SourcePicker } from './components/SourcePicker';
 import { pinnedManifestUrl, resolveManifestUrl, sampleSources, sourceFromUrl, type ManifestSource } from './sources';
@@ -21,6 +21,11 @@ function resolveSources(): { sources: ManifestSource[]; pinned: boolean; invalid
   if (!url) return { sources: sampleSources(), pinned: false };
   const source = sourceFromUrl(url);
   return source ? { sources: [source], pinned: true } : { sources: [], pinned: true, invalidUrl: url };
+}
+
+// Hosts of an iframe receive interactions as messages. Without an embedder nothing is sent anywhere.
+function forwardEvent(event: AppLensEvent): void {
+  if (embedded && window.parent !== window) window.parent.postMessage({ type: 'app-lens:event', event }, '*');
 }
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; manifest: unknown };
@@ -82,6 +87,7 @@ export function App() {
         toolbar={toolbar}
         initialTab={initialTab}
         initialPersona={initialPersona}
+        onEvent={forwardEvent}
       />
     );
   }

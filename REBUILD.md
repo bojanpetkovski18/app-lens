@@ -5,7 +5,7 @@ This file records **everything that has been built and changed in AppLens so far
 - [HANDOFF.md](HANDOFF.md) says **what to do next**: the GitHub workflow, the phase plan and the rules.
 - This file says **what already exists, how it was built, and how to rebuild it**.
 
-Last updated: 2026-10-30, after **Phase 3** (see Part A).
+Last updated: 2026-10-30, after **Phase 4** (see Part A).
 
 ---
 
@@ -97,6 +97,24 @@ The review started with a baseline, and each confirmed bug got a regression test
 - **Viewer:** the pinned manifest wins over `?manifest=`, invalid URLs and invalid JSON show errors, and fetches use `AbortController`.
 - **Embed:** waits for inline JSON that isn't parsed yet, shares one constructable stylesheet, aborts stale fetches, has no `key` on `AppLensView`, and fires `app-lens:error` for invalid manifests.
 - **CLI:** `parseCliArgs` and `serveStatic` are exported. Bad flags, folders and busy ports are `CliError`s. `init` creates parent folders. Built sites get a CSP meta tag, and the server checks `Host`.
+
+## A.5 Phase 4: Smarts (done)
+
+New core modules, all pure:
+
+- `intake.ts`: `ProjectSignals`, `mergeSignals`, `kindForName`, and `draftManifest`, which cleans names, applies limits, breaks reference cycles, generates a walkthrough from a status enum and returns a report with evidence for each item.
+- `importers.ts`: `importOpenApi` (OpenAPI 3 and Swagger 2, local `$ref` only), `importPrisma`, `importReadme`.
+- `lint.ts`: `lintManifest` (a 0-100 score with findings) and `diffManifests`.
+- `export.ts`: `buildOnePager`, `renderMarkdown`, `entityDiagram`, and `renderPdf`, a dependency-free writer using the standard PDF fonts.
+- `csv.ts`: `recordsToCsv`, which neutralises spreadsheet formulas.
+
+Elsewhere:
+
+- The schema gains an optional top-level `draft` object (`thirdParty`, `source`).
+- UI: `analytics.tsx` (`AnalyticsProvider`, `useTrack`), `onEvent` on `AppLensView`, `video.ts` (canvas renderer, `recordDemo` with `MediaRecorder`), and one-pager, CSV and JSON download buttons.
+- Embed: re-dispatches interactions as `app-lens:event`. Viewer: forwards them to an iframe parent.
+- CLI: `smarts.ts` with `ingest`, `export`, `lint` and `diff`; `preview --watch` with live reload over server-sent events. The `yaml` dependency is bundled, so the esbuild banner adds a `require` created with `createRequire`.
+- `e2e/cli.spec.ts` runs the built binary, because unit tests import the sources and cannot catch bundling problems.
 
 ---
 
@@ -892,7 +910,7 @@ Run these from the repo root. All must pass before PR #1 is opened (HANDOFF sect
 ```bash
 npm install
 npm run typecheck      # every package, 0 errors
-npm test               # 124 tests: 61 core, 27 CLI, 22 UI, 11 embed, 3 viewer
+npm test               # 173 tests: 90 core, 38 CLI, 30 UI, 12 embed, 3 viewer
 npm run build          # viewer -> embed -> cli; Rollup may print zod annotation warnings, which are harmless
 npm run app-lens -- --help
 npm run app-lens -- validate samples/invoiceflow.app-lens.json

@@ -1,5 +1,6 @@
 import { generateDataset, type Manifest } from '@app-lens/core';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useTrack } from '../analytics';
 import { Frame, type ThemeOverrides } from '../theme';
 import { initials, isForPersona, isScenarioForPersona } from '../util';
 import { DataExplorer, type DataFocus } from './DataExplorer';
@@ -33,6 +34,16 @@ export function Showcase({ manifest, theme, embedded, toolbar, initialTab, initi
   useEffect(() => {
     setPersona(knownPersona);
   }, [knownPersona]);
+
+  const track = useTrack();
+  const firstRender = useRef(true);
+  useEffect(() => {
+    track({ type: 'tab_viewed', tab });
+  }, [tab, track]);
+  useEffect(() => {
+    if (firstRender.current) firstRender.current = false;
+    else track({ type: 'persona_changed', persona });
+  }, [persona, track]);
 
   const idBase = useId();
   const tabRefs = useRef(new Map<Tab, HTMLButtonElement>());

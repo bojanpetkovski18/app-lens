@@ -1,5 +1,5 @@
 import { importOpenApi, importPrisma, importReadme } from './importers';
-import { emptySignals, mergeSignals, toFieldName, type EntitySignal, type FeatureSignal, type ProjectSignals } from './intake';
+import { emptySignals, kindForName, mergeSignals, toFieldName, type EntitySignal, type FeatureSignal, type ProjectSignals } from './intake';
 
 export interface ProjectFile {
   /** Relative to the project root, with forward slashes. */
@@ -24,7 +24,7 @@ const README_FILE = /^readme(\.[a-z]+)?$/i;
 const PRISMA_FILE = /(^|\/)schema\.prisma$/i;
 const ROUTE_FILE = /(?:^|\/)(?:src\/)?(pages|app|routes|views)\/(.+?)\.(tsx|jsx|vue|svelte|html?)$/i;
 const FORM_FILE = /\.(tsx|jsx|vue|svelte|html?)$/i;
-const SKIPPED_ROUTE = /^(_|\[|index$|layout$|page$|loading$|error$|not-found$|404$|500$|api\/|login|logout|signin|signup|sign-in|sign-up|register$|auth|privacy|terms)/i;
+const SKIPPED_ROUTE = /^(_|\[|api\/)|^(index|layout|page|loading|error|not-found|404|500|login|logout|signin|signup|sign-in|sign-up|register|auth|privacy|terms|components?|hooks|lib|utils?|styles|assets|shared|common|ui)(\/|$)/i;
 
 const KNOWN_INTEGRATIONS: [RegExp, string][] = [
   [/^stripe$|^@stripe\//, 'Stripe'],
@@ -74,7 +74,7 @@ function readPackageJson(file: ProjectFile, signals: ProjectSignals): void {
 function routeFeature(path: string): FeatureSignal | null {
   const match = ROUTE_FILE.exec(path);
   if (!match?.[2]) return null;
-  const route = match[2].replace(/\/(index|page)$/i, '').replace(/\([^)]*\)\//g, '');
+  const route = match[2].replace(/\([^)]*\)(\/|$)/g, '').replace(/(^|\/)(index|page)$/i, '');
   if (SKIPPED_ROUTE.test(route)) return null;
   const first = route.split('/').find((segment) => !segment.startsWith('[') && !segment.startsWith(':'));
   return first ? { title: title(first), evidence: [{ source: path, detail: 'route' }], confidence: 'low' } : null;
@@ -84,24 +84,18 @@ const INPUT_NAME = /<(?:input|select|textarea|Input|Select|Textarea)\b[^>]{0,300
 const INPUT_TYPE = /\btype=["']([a-z-]+)["']/;
 const TYPE_KINDS: Record<string, string> = { email: 'email', tel: 'phone', date: 'date', 'datetime-local': 'datetime', number: 'int:0..1000', checkbox: 'bool', url: 'words', password: '' };
 
-function kindFromInput(tag: string, name: string): string {
-  const type = INPUT_TYPE.exec(tag)?.[1];
-  return (type !== undefined ? TYPE_KINDS[type] : undefined) ?? fieldKindByName(name);
+/** Input types come from other people's pages, so "constructor" must not find Object.prototype. */
+function inputKind(type: string): string | undefined {
+  return Object.hasOwn(TYPE_KINDS, type) ? TYPE_KINDS[type] : undefined;
 }
 
-const FIELD_NAME_KINDS: [RegExp, string][] = [
-  [/name$/i, 'fullName'],
-  [/email/i, 'email'],
-  [/phone/i, 'phone'],
-  [/company/i, 'company'],
-  [/city/i, 'city'],
-  [/country/i, 'country'],
-  [/message|description|comment/i, 'sentence'],
-  [/title/i, 'title'],
-];
+function kindFromInput(tag: string, name: string): string {
+  const type = INPUT_TYPE.exec(tag)?.[1];
+  return (type !== undefined ? inputKind(type) : undefined) ?? fieldKindByName(name);
+}
 
 function fieldKindByName(name: string): string {
-  return FIELD_NAME_KINDS.find(([pattern]) => pattern.test(name))?.[1] ?? 'words';
+  return /message/i.test(name) ? 'sentence' : kindForName(name, 'words');
 }
 
 /** Form fields map to an entity named after the file. Password fields are ignored. */
@@ -129,7 +123,7 @@ function readColors(text: string, signals: ProjectSignals): void {
 
 function rolePersonas(file: ProjectFile, signals: ProjectSignals): void {
   const roles = /enum\s+(?:User)?Role\s*\{([^}]*)\}/.exec(file.text)?.[1];
-  for (const role of (roles ?? '').split(/\s+/).filter((value) => /^[A-Za-z_]+$/.test(value))) {
+  for (const role of (roles ?? '').replace(/\/\/.*$/gm, '').split(/\s+/).filter((value) => /^[A-Za-z_]+$/.test(value))) {
     const label = title(role.toLowerCase());
     signals.personas.push({ label, evidence: [{ source: file.path, detail: 'role enum' }], confidence: 'medium' });
   }
@@ -245,7 +239,7 @@ export function signalsFromPages(pages: readonly PageSummary[], manifest?: WebMa
       const fields: Record<string, string> = {};
       for (const field of form.fields) {
         const name = toFieldName(field.name);
-        const kind = field.type && field.type in TYPE_KINDS ? TYPE_KINDS[field.type] : fieldKindByName(name);
+        const kind = (field.type ? inputKind(field.type) : undefined) ?? fieldKindByName(name);
         if (name && kind) fields[name] = kind;
       }
       if (Object.keys(fields).length < 2) continue;

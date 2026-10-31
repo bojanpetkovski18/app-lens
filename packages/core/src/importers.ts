@@ -4,6 +4,8 @@ type Json = Record<string, unknown>;
 
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value);
 const asString = (value: unknown): string | undefined => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+/** An unquoted "version: 2" in YAML arrives as a number. */
+const asVersion = (value: unknown): string | undefined => (typeof value === 'number' ? String(value) : asString(value));
 const MAX_ALLOF_DEPTH = 8;
 
 function schemaName(ref: unknown): string | undefined {
@@ -54,14 +56,16 @@ function propertySpec(name: string, schema: Json): string | null {
   }
 }
 
-function collectProperties(schema: Json, all: Json, depth = 0): Record<string, Json> {
-  if (depth > MAX_ALLOF_DEPTH) return {};
+/** Each schema is visited once, because a spec can list the same schema any number of times. */
+function collectProperties(schema: Json, all: Json, depth = 0, visited = new Set<Json>()): Record<string, Json> {
+  if (depth > MAX_ALLOF_DEPTH || visited.has(schema)) return {};
+  visited.add(schema);
   const properties: Record<string, Json> = {};
   for (const part of Array.isArray(schema.allOf) ? schema.allOf : []) {
     if (!isObject(part)) continue;
     const target = schemaName(part.$ref);
     const resolved = target ? all[target] : part;
-    if (isObject(resolved)) Object.assign(properties, collectProperties(resolved, all, depth + 1));
+    if (isObject(resolved)) Object.assign(properties, collectProperties(resolved, all, depth + 1, visited));
   }
   if (isObject(schema.properties)) {
     for (const [name, value] of Object.entries(schema.properties)) {
@@ -99,7 +103,7 @@ export function importOpenApi(doc: unknown, source = 'openapi'): ProjectSignals 
   const info = isObject(doc.info) ? doc.info : {};
   signals.appName = asString(info.title);
   signals.description = asString(info.description);
-  signals.version = asString(info.version);
+  signals.version = asVersion(info.version);
 
   const components = isObject(doc.components) ? doc.components : {};
   const schemas = isObject(components.schemas) ? components.schemas : isObject(doc.definitions) ? doc.definitions : {};
@@ -152,8 +156,9 @@ const PRISMA_NUMBERS: Record<string, string> = { Int: 'int:0..1000', BigInt: 'in
 /** Reads a Prisma schema. Only declarations are parsed, nothing is executed. */
 export function importPrisma(text: string, source = 'schema.prisma'): ProjectSignals {
   const signals = emptySignals();
-  const clean = text.replace(/\/\/.*$/gm, '');
-  const blocks = [...clean.matchAll(/^\s*(model|enum)\s+(\w+)\s*\{([^}]*)\}/gm)];
+  // Strings are matched first, so "//" in a URL default is not a comment and "}" in one does not end a block.
+  const clean = text.replace(/"(?:[^"\\\n]|\\.)*"|\/\/.*$/gm, (match) => (match.startsWith('"') ? match : ''));
+  const blocks = [...clean.matchAll(/^\s*(model|enum)\s+(\w+)\s*\{((?:"(?:[^"\\]|\\.)*"|[^}"])*)\}/gm)];
 
   const enums = new Map<string, string[]>();
   for (const [, type, name, body] of blocks) {
@@ -205,10 +210,12 @@ function plainText(value: string): string {
   return value
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/<[^>]{1,200}>/g, '')
+    .replace(/<\/?[a-z][^<>]{0,200}>/gi, '')
     .replace(/`([^`]*)`/g, '$1')
-    .replace(/(\*\*|__)(.*?)\1/g, '$2')
-    .replace(/(\*|_)(.*?)\1/g, '$2')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/(^|\W)__(.+?)__(?!\w)/g, '$1$2')
+    .replace(/(^|[^\w*])\*(?=\S)(.+?)(?<=\S)\*(?![\w*])/g, '$1$2')
+    .replace(/(^|\W)_(?=\S)(.+?)(?<=\S)_(?!\w)/g, '$1$2')
     .trim();
 }
 

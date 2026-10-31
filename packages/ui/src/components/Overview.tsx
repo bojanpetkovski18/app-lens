@@ -28,8 +28,7 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
 
   return (
     <div className="al-stack">
-      {app.description || app.website ? (
-        <section className="al-card">
+      <section className="al-card">
           {app.description ? <p>{app.description}</p> : null}
           {app.website ? (
             <a href={app.website} target="_blank" rel="noreferrer noopener">
@@ -41,8 +40,7 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
             <button type="button" className="al-link" onClick={() => downloadBlob(new Blob([renderPdf(manifest).slice()], { type: 'application/pdf' }), `${fileName}.pdf`)}>PDF</button>
             <button type="button" className="al-link" onClick={() => downloadBlob(new Blob([renderMarkdown(manifest)], { type: 'text/markdown' }), `${fileName}.md`)}>Markdown</button>
           </div>
-        </section>
-      ) : null}
+      </section>
 
       <div className="al-stats">
         {stats.map((stat) => (
@@ -104,7 +102,7 @@ export function Overview({ manifest, dataset, persona, onPersona, onTab, onOpenD
                 <h3>{entity.label ?? name}</h3>
                 {entity.description ? <p className="al-muted">{entity.description}</p> : null}
                 <button type="button" className="al-chip" onClick={() => onOpenData({ entity: name })}>
-                  {dataset[name]?.length ?? 0} sample records
+                  {dataset[name]?.length ?? 0} sample {dataset[name]?.length === 1 ? 'record' : 'records'}
                 </button>
               </article>
             ))}

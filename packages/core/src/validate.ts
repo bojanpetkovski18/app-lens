@@ -63,7 +63,8 @@ function valueProblem(spec: FieldSpec, value: unknown): string | null {
       return typeof value === 'boolean' ? null : `"${String(value)}" is not true or false.`;
     case 'date':
     case 'datetime':
-      return value === '$today' || value === '$now' || !Number.isNaN(new Date(String(value)).getTime())
+      // new Date() alone would accept text like "banana 1".
+      return value === '$today' || value === '$now' || (/^\d{4}-\d{2}-\d{2}(T|$)/.test(String(value)) && !Number.isNaN(new Date(String(value)).getTime()))
         ? null
         : `"${String(value)}" is not a date.`;
     default:

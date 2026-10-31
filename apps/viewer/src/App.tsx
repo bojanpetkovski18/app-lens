@@ -75,7 +75,9 @@ export function App() {
   const selectSource = (key: string) => {
     setActiveKey(key);
     const url = new URL(window.location.href);
-    url.searchParams.set('source', key);
+    // Attached projects only exist in this tab, so a link to one would be dead after a reload.
+    if (key.startsWith('attached:')) url.searchParams.delete('source');
+    else url.searchParams.set('source', key);
     window.history.replaceState(null, '', url);
   };
 

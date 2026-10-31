@@ -1,7 +1,7 @@
 # AppLens: handoff notes
 
 Read this first when picking the project up on another machine or in a new session.
-Last updated: 2026-10-31, before the 1.0.0 release.
+Last updated: 2026-10-31, after the release code review.
 
 **On a new machine, do section 0 before anything else.**
 
@@ -62,7 +62,7 @@ It is a personal project. It must stay **independent of any employer or third-pa
 | 5. Project intake | Attach a project as a local folder, a GitHub link or a published URL (e.g. `www.reddit.com`) and get a draft manifest | `phase-5/project-intake` | Merged into `dev` |
 | 6. Studio | Visual manifest editor with live preview, optional AI drafting, `app-lens studio`, and a GitHub Pages workflow | `phase-6/studio` | Merged into `dev` |
 
-Verified on 2026-10-31: 308 unit tests pass (118 core, 126 CLI, 30 UI, 13 embed, 12 viewer, 9 studio), 190 Playwright e2e tests pass, typecheck and lint pass, `npm run build` succeeds, and `npm audit --omit=dev` reports 0. See [PROGRESS.md](PROGRESS.md) for current numbers. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
+Verified on 2026-10-31: 380 unit tests pass (144 core, 149 CLI, 40 UI, 13 embed, 12 viewer, 22 studio), 197 Playwright e2e tests pass, typecheck and lint pass, `npm run build` succeeds, and `npm audit --omit=dev` reports 0. See [PROGRESS.md](PROGRESS.md) for current numbers. **AI drafting is tested with a fake client only: it has not been run against the live Claude API.**
 
 ## 3. Requirements and quick start
 
@@ -208,7 +208,7 @@ app-lens export pdf app-lens.json                  # also: md, with a Mermaid da
 app-lens attach ./my-project
 app-lens attach https://github.com/owner/repo/tree/branch/folder
 app-lens attach www.example.com
-# --out --report --max-files --max-pages --dry-run --json
+# --out --report --max-files --max-pages --dry-run --force --json
 # --own        this URL or repo is mine, so no third-party marking
 # --third-party  this folder is someone else's
 ```
@@ -264,7 +264,7 @@ Feature ranking is in `rankFeatures`. It scores highlights, linked entities, des
 - Sites that render everything with JavaScript give thin drafts, because intake never runs scripts. A headless mode could come later behind a flag.
 - A folder with a plain README and no routes, specs or schemas gives a thin draft. Monorepos only read the root README and `package.json`.
 - Walkthroughs are edited in Studio's JSON tab, not the form.
-- The Studio preview runs at full speed on every valid edit, so very large manifests will feel slow.
+- The Studio preview regenerates data on every valid edit, so very large manifests will feel slow.
 - The GitHub Pages deployment needs *Settings → Pages → Source: GitHub Actions*. Studio there has no local server, so Save, GitHub and website attach, and AI drafting are unavailable. Folder attach works.
 - PDF export uses the built-in Helvetica font, so text outside Latin is transliterated or replaced with `?`.
 - The `app-lens.mjs` (ES) embed build is not minified; `app-lens.js` (IIFE) is.

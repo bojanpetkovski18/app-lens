@@ -88,6 +88,7 @@ npx playwright install chromium && npm run e2e
 - [REBUILD.md](REBUILD.md): complete build record
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how it works
 - [docs/AUDIT.md](docs/AUDIT.md): accessibility and polish audit
+- [docs/CODE-REVIEW.md](docs/CODE-REVIEW.md): release code review and fixes
 - [PROGRESS.md](PROGRESS.md) and [DECISIONS.md](DECISIONS.md): status, measured results and why things are built this way
 
 ## Built with AI assistance

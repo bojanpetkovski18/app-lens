@@ -161,3 +161,27 @@ Numbered, and never renumbered. D001 to D012 were written up on 2026-10-31 from 
 - **Why:** `?manifest=` and `src` accept any URL, and an endless response would otherwise fill the tab's memory. The sample manifests are far smaller than the limit.
 - **Alternatives:** Trust `Content-Length`, which can be missing or false.
 - **Trade-offs:** A legitimate manifest over 5 MB is refused, with a clear message.
+
+## D021: Match untrusted patterns with a hand-written matcher
+
+- **Date:** 2026-10-31
+- **Decision:** `robots.txt` rules and `.gitignore` patterns go through `matchesWildcard`, not a generated regular expression.
+- **Why:** Both come from other people's content, and a crafted pattern made a regular expression run for longer than the test's 20 second limit. That froze the CLI and Studio's server.
+- **Alternatives:** Limit the number of wildcards, which doesn't help much, since eight can still take years. A safe-regex library would be a new dependency.
+- **Trade-offs:** About 50 more lines to own. The cost is at most pattern length times text length.
+
+## D022: `attach` no longer overwrites without `--force`
+
+- **Date:** 2026-10-31
+- **Decision:** `attach` refuses to replace its manifest or report unless `--force` is passed, like `init` and `ingest`.
+- **Why:** The default output is `app-lens.json`, the same name as a hand-written manifest, so a plain run could destroy one.
+- **Alternatives:** Write to a different default name, which would change what the README describes.
+- **Trade-offs:** Running `attach` twice now needs `--force`.
+
+## D023: A site is whatever host it redirects to
+
+- **Date:** 2026-10-31
+- **Decision:** If the first page redirects to another host, the crawl continues there and reads that host's `robots.txt`. A later page that redirects off the site is left out.
+- **Why:** Most sites redirect to a canonical host, and the crawl used to stop after one page.
+- **Alternatives:** Treat a redirect as a failure, which would refuse most sites.
+- **Trade-offs:** A first page that redirects to an unrelated site gets drafted from that site. Its address is in the report.

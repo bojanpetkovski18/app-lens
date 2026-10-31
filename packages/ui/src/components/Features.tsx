@@ -79,8 +79,8 @@ export function Features({ manifest, persona, onOpenData }: FeaturesProps) {
                 </ul>
               ) : null}
               <div className="al-tags">
-                {feature.personas.map((id) => <span key={id} className="al-tag">{personaLabel(id)}</span>)}
-                {feature.entities.map((entity) => (
+                {[...new Set(feature.personas)].map((id) => <span key={id} className="al-tag">{personaLabel(id)}</span>)}
+                {[...new Set(feature.entities)].map((entity) => (
                   <button key={entity} type="button" className="al-chip" onClick={() => onOpenData({ entity })}>
                     {manifest.entities[entity]?.label ?? entity}
                   </button>

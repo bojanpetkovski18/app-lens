@@ -78,6 +78,7 @@ export async function ingest(type: string, file: string | undefined, options: Op
     signalsFromFile(type, file);
     const result = await aiDraft(readText(file), type === 'openapi' ? 'OpenAPI spec' : type === 'prisma' ? 'Prisma schema' : 'README', client, (message) => console.log(message));
     writeJson(out, result.manifest);
+    if (options.report) console.log('--report is skipped with --ai, because a report lists what the non-AI draft found.');
     console.log(`Drafted ${out} with Claude. Review it before you publish it, for example in "app-lens studio ${out}".`);
     return;
   }

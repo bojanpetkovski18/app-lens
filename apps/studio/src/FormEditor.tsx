@@ -1,5 +1,6 @@
 import { FIELD_KINDS, type ManifestInput } from '@app-lens/core';
 import type { ReactNode } from 'react';
+import { removeEntity, removePersona, renameEntity, renameField, splitLines } from './editor';
 
 type Update = (change: (draft: ManifestInput) => void) => void;
 
@@ -36,7 +37,6 @@ function Remove({ label, onClick }: { label: string; onClick: () => void }) {
   return <button type="button" className="al-link" aria-label={`Remove ${label}`} onClick={onClick}>Remove</button>;
 }
 
-const lines = (value: string): string[] => value.split('\n');
 const optional = (value: string): string | undefined => value || undefined;
 
 function uniqueId(base: string, taken: readonly { id: string }[]): string {
@@ -49,11 +49,6 @@ function uniqueKey(base: string, taken: Record<string, unknown>): string {
   let key = base;
   for (let suffix = 2; Object.hasOwn(taken, key); suffix++) key = `${base}${suffix}`;
   return key;
-}
-
-/** Renames a key without moving it, because order decides how fields are generated and shown. */
-function renameKey<T>(record: Record<string, T>, from: string, to: string): Record<string, T> {
-  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key === from ? to : key, value]));
 }
 
 function FieldRow({ name, spec, onName, onSpec, onRemove }: { name: string; spec: string; onName: (value: string) => void; onSpec: (value: string) => void; onRemove: () => void }) {
@@ -104,10 +99,10 @@ export function FormEditor({ value, onUpdate }: { value: ManifestInput; onUpdate
       <Section title="Personas" count={personas.length}>
         {personas.map((persona, index) => (
           <div key={index} className="al-form-item">
-            <div className="al-row al-row-between"><strong>{persona.label || 'New persona'}</strong><Remove label={persona.label} onClick={() => onUpdate((d) => { d.personas?.splice(index, 1); })} /></div>
+            <div className="al-row al-row-between"><strong>{persona.label || 'New persona'}</strong><Remove label={persona.label} onClick={() => onUpdate((d) => removePersona(d, index))} /></div>
             <Text label="Label" value={persona.label} onChange={(next) => onUpdate((d) => { (d.personas as NonNullable<ManifestInput['personas']>)[index]!.label = next; })} />
             <Text label="Description" value={persona.description} onChange={(next) => onUpdate((d) => { (d.personas as NonNullable<ManifestInput['personas']>)[index]!.description = optional(next); })} />
-            <Text label="Goals, one per line" multiline value={persona.goals?.join('\n')} onChange={(next) => onUpdate((d) => { (d.personas as NonNullable<ManifestInput['personas']>)[index]!.goals = lines(next); })} />
+            <Text label="Goals, one per line" multiline value={persona.goals?.join('\n')} onChange={(next) => onUpdate((d) => { (d.personas as NonNullable<ManifestInput['personas']>)[index]!.goals = splitLines(next); })} />
           </div>
         ))}
         <button type="button" className="al-btn" onClick={() => onUpdate((d) => { d.personas = [...(d.personas ?? []), { id: uniqueId('persona', personas), label: 'New persona' }]; })}>Add persona</button>
@@ -119,9 +114,9 @@ export function FormEditor({ value, onUpdate }: { value: ManifestInput; onUpdate
           return (
             // Keyed by position: a name key would remount the input and lose focus while renaming.
             <div key={entityIndex} className="al-form-item">
-              <div className="al-row al-row-between"><strong>{name}</strong><Remove label={name} onClick={() => onUpdate((d) => { delete d.entities?.[name]; })} /></div>
+              <div className="al-row al-row-between"><strong>{name}</strong><Remove label={name} onClick={() => onUpdate((d) => removeEntity(d, name))} /></div>
               <div className="al-field-pair">
-                <Text label="Name" value={name} onChange={(next) => onUpdate((d) => { d.entities = renameKey(d.entities ?? {}, name, next); })} />
+                <Text label="Name" value={name} onChange={(next) => onUpdate((d) => renameEntity(d, name, next))} />
                 <label className="al-field">
                   <span>Sample records</span>
                   <input className="al-input" type="number" min={0} max={500} value={entity.count ?? 8} onChange={(event) => onUpdate((d) => { d.entities![name]!.count = Number(event.target.value); })} />
@@ -132,7 +127,7 @@ export function FormEditor({ value, onUpdate }: { value: ManifestInput; onUpdate
                   key={fieldIndex}
                   name={field}
                   spec={spec}
-                  onName={(next) => onUpdate((d) => { d.entities![name]!.fields = renameKey(d.entities![name]!.fields, field, next); })}
+                  onName={(next) => onUpdate((d) => renameField(d, name, field, next))}
                   onSpec={(next) => onUpdate((d) => { d.entities![name]!.fields[field] = next; })}
                   onRemove={() => onUpdate((d) => { delete d.entities![name]!.fields[field]; })}
                 />
@@ -156,7 +151,7 @@ export function FormEditor({ value, onUpdate }: { value: ManifestInput; onUpdate
                 <Text label="Category" value={feature.category} onChange={(next) => edit((item) => { item.category = optional(next); })} />
                 <Text label="Tier" value={feature.tier} onChange={(next) => edit((item) => { item.tier = optional(next); })} />
               </div>
-              <Text label="Highlights, one per line" multiline value={feature.highlights?.join('\n')} onChange={(next) => edit((item) => { item.highlights = lines(next); })} />
+              <Text label="Highlights, one per line" multiline value={feature.highlights?.join('\n')} onChange={(next) => edit((item) => { item.highlights = splitLines(next); })} />
               {personas.length > 0 ? (
                 <fieldset className="al-checks">
                   <legend>For</legend>

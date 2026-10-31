@@ -65,8 +65,12 @@ export function entityDiagram(manifest: Manifest): string | null {
   return lines.length > 0 ? ['erDiagram', ...lines].join('\n') : null;
 }
 
+/** Manifest text stays inline: a line break or a leading "#" must not start a new block. */
 function escapeMarkdown(text: string): string {
-  return text.replace(/([\\`*_[\]<>])/g, '\\$1');
+  return text
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/([\\`*_[\]<>])/g, '\\$1')
+    .replace(/^(#|[-+]\s|\d+[.)]\s)/, '\\$1');
 }
 
 export function renderMarkdown(manifest: Manifest): string {
@@ -105,10 +109,26 @@ function textWidth(text: string, size: number): number {
   return (total * size) / 1000;
 }
 
+/** A long URL has no spaces to wrap at, so it is cut to the line width. */
+function splitWord(word: string, size: number, width: number): string[] {
+  if (textWidth(word, size) <= width) return [word];
+  const parts: string[] = [];
+  let part = '';
+  for (const char of word) {
+    if (part && textWidth(part + char, size) > width) {
+      parts.push(part);
+      part = char;
+    } else {
+      part += char;
+    }
+  }
+  return [...parts, part];
+}
+
 function wrap(text: string, size: number, width: number): string[] {
   const lines: string[] = [];
   let line = '';
-  for (const word of text.split(/\s+/).filter(Boolean)) {
+  for (const word of text.split(/\s+/).filter(Boolean).flatMap((item) => splitWord(item, size, width))) {
     const candidate = line ? `${line} ${word}` : word;
     if (line && textWidth(candidate, size) > width) {
       lines.push(line);

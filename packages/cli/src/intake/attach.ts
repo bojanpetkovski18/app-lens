@@ -29,6 +29,7 @@ export interface AttachOptions {
   out?: string;
   report?: string;
   dryRun?: boolean;
+  force?: boolean;
   maxFiles?: number;
   maxPages?: number;
   /** Declares that a URL or repo is the user's own project. */
@@ -76,7 +77,8 @@ function sourceLabel(source: AttachSource): string {
 
 /** Third-party drafts may not go where they could reach a build or the repository. */
 function assertSafeOutput(out: string): void {
-  const parts = resolve(out).split(sep);
+  // Measured from here, because the folder above a project may have any name.
+  const parts = relative(process.cwd(), resolve(out)).split(sep);
   if (parts.includes('samples')) throw new CliError('A draft of a third-party project must never go into samples/. Use the drafts/ folder.');
   const relativeToDrafts = relative(resolve('drafts'), resolve(out));
   if (relativeToDrafts.startsWith('..') || isAbsolute(relativeToDrafts)) {
@@ -116,6 +118,11 @@ export async function attach(value: string, options: AttachOptions = {}): Promis
   if (thirdParty) assertSafeOutput(out);
   const reportPath = options.report ?? join(dirname(out), 'app-lens.intake.json');
   if (!options.dryRun) {
+    if (!options.force) {
+      for (const path of [out, reportPath]) {
+        if (existsSync(path)) throw new CliError(`${path} already exists. Use --force to overwrite it.`);
+      }
+    }
     writeJson(out, draft.manifest);
     writeJson(reportPath, { source: label, thirdParty, ...draft.report });
   }

@@ -1,10 +1,14 @@
 import type { PageForm, PageSummary, WebManifestInfo } from '@app-lens/core';
 import { Parser } from 'htmlparser2';
 import { safeFetch, type SafeFetchOptions } from './net';
+import { matchesWildcard, type WildcardToken } from './wildcard';
 
 const MAX_LINKS = 60;
 const MAX_FORMS = 10;
 const MAX_FIELDS = 30;
+/** robots.txt is untrusted. A rule cut short only matches more paths, so the crawl stays polite. */
+const MAX_RULE_LENGTH = 512;
+const MAX_RULES = 500;
 
 /** Normalises a bare host such as "www.reddit.com" to https://www.reddit.com/. */
 export function normalizeSiteUrl(value: string): URL | null {
@@ -44,19 +48,19 @@ export function parseRobots(text: string, agent = 'applens'): RobotsRules {
       inRules = true;
       for (const name of current) {
         const group = groups.get(name) ?? { disallow: [], allow: [] };
-        if (value) group[key].push(value);
+        if (value && group[key].length < MAX_RULES) group[key].push(value.slice(0, MAX_RULE_LENGTH));
         groups.set(name, group);
       }
     }
   }
-  const group = [...groups.entries()].find(([name]) => name !== '*' && agent.includes(name))?.[1] ?? groups.get('*') ?? { disallow: [], allow: [] };
+  const group = groups.get(agent) ?? groups.get('*') ?? { disallow: [], allow: [] };
   return { ...group, sitemaps };
 }
 
 function ruleMatches(rule: string, path: string): boolean {
   const anchored = rule.endsWith('$');
-  const pattern = (anchored ? rule.slice(0, -1) : rule).split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*');
-  return new RegExp(`^${pattern}${anchored ? '$' : ''}`).test(path);
+  const tokens = [...(anchored ? rule.slice(0, -1) : rule).replace(/\*+/g, '*')].map((char): WildcardToken => (char === '*' ? { type: 'star', crossSlash: true } : { type: 'char', char }));
+  return matchesWildcard(tokens, path, { canStart: (index) => index === 0, canEnd: (index) => !anchored || index === path.length });
 }
 
 /** The longest matching rule wins, and allow wins ties. */
@@ -81,7 +85,7 @@ export function parsePage(html: string, pageUrl: string): PageSummary & { manife
     onopentag(name, attrs) {
       if (name === 'title') inTitle = true;
       else if (name === 'h1' && !page.h1) inH1 = true;
-      else if (name === 'nav' || (name === 'header' && navDepth === 0)) navDepth++;
+      else if (name === 'nav' || name === 'header') navDepth++;
       else if (name === 'meta') {
         const key = (attrs.name ?? attrs.property ?? '').toLowerCase();
         if (key === 'description' || key === 'og:description') page.description ??= attrs.content;
@@ -154,21 +158,24 @@ const HTML = /text\/html|application\/xhtml/i;
 export async function crawlSite(start: URL, options: CrawlOptions = {}): Promise<CrawlResult> {
   const notes: string[] = [];
   const { maxPages = DEFAULT_MAX_PAGES, delayMs = 250 } = options;
-  const rootUrl = new URL('/', start).href;
+  const readRobots = async (site: URL): Promise<RobotsRules> => {
+    const robots = await safeFetch(new URL('/robots.txt', site).href, options).catch(() => null);
+    return robots?.status === 200 ? parseRobots(robots.text) : { allow: [], disallow: [], sitemaps: [] };
+  };
+  const assertAllowed = (rules: RobotsRules, site: URL) => {
+    if (!isAllowedByRobots(rules, site.pathname + site.search)) throw new Error(`robots.txt does not allow crawling ${site.href}.`);
+  };
 
-  let rules: RobotsRules = { allow: [], disallow: [], sitemaps: [] };
-  const robots = await safeFetch(new URL('/robots.txt', start).href, options).catch(() => null);
-  if (robots?.status === 200) rules = parseRobots(robots.text);
-  if (!isAllowedByRobots(rules, start.pathname)) {
-    throw new Error(`robots.txt does not allow crawling ${start.href}.`);
-  }
+  let origin = start.origin;
+  let rules = await readRobots(start);
+  assertAllowed(rules, start);
 
   const queue = [start.href];
   const seen = new Set(queue);
   const enqueue = (href: string) => {
     if (seen.has(href) || seen.size > maxPages * 20) return;
     const url = new URL(href);
-    if (url.origin !== start.origin) return;
+    if (url.origin !== origin) return;
     seen.add(href);
     if (isAllowedByRobots(rules, url.pathname + url.search)) queue.push(href);
     else notes.push(`Skipped ${href}: disallowed by robots.txt.`);
@@ -182,7 +189,17 @@ export async function crawlSite(start: URL, options: CrawlOptions = {}): Promise
       notes.push(`Skipped ${href}: ${error.message}`);
       return null;
     });
-    if (response && response.status === 200 && HTML.test(response.contentType)) {
+    const landed = response ? new URL(response.url) : null;
+    // Many sites redirect to a canonical host. That host then becomes the site being crawled.
+    if (landed && pages.length === 0 && landed.origin !== origin) {
+      origin = landed.origin;
+      rules = await readRobots(landed);
+      assertAllowed(rules, landed);
+    }
+    if (response) seen.add(response.url);
+    const stayed = landed !== null && landed.origin === origin && isAllowedByRobots(rules, landed.pathname + landed.search);
+    if (landed && !stayed) notes.push(`Skipped ${href}: it redirects outside what may be crawled.`);
+    else if (response && response.status === 200 && HTML.test(response.contentType)) {
       const page = parsePage(response.text, response.url);
       // A disallowed page stays out of the draft, not only out of the crawl.
       page.navLinks = page.navLinks.filter((link) => {
@@ -192,12 +209,12 @@ export async function crawlSite(start: URL, options: CrawlOptions = {}): Promise
       pages.push(page);
       page.navLinks.forEach((link) => enqueue(link.href));
       if (pages.length === 1) {
-        const sitemaps = rules.sitemaps.length > 0 ? rules.sitemaps : [new URL('/sitemap.xml', rootUrl).href];
+        const sitemaps = rules.sitemaps.length > 0 ? rules.sitemaps : [new URL('/sitemap.xml', origin).href];
         const sitemap = await safeFetch(sitemaps[0] as string, options).catch(() => null);
         if (sitemap?.status === 200) sitemapUrls(sitemap.text).slice(0, 200).forEach((url) => { try { enqueue(url); } catch { /* invalid entry */ } });
       }
     } else if (response && pages.length === 0) {
-      throw new Error(`${href} responded with HTTP ${response.status}.`);
+      throw new Error(response.status === 200 ? `${href} is not an HTML page.` : `${href} responded with HTTP ${response.status}.`);
     }
     if (delayMs > 0 && queue.length > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
@@ -205,13 +222,13 @@ export async function crawlSite(start: URL, options: CrawlOptions = {}): Promise
   const manifestHref = pages[0]?.manifestHref;
   let manifest: WebManifestInfo | undefined;
   if (manifestHref) {
-    const file = await safeFetch(new URL(manifestHref, pages[0]?.url).href, options).catch(() => null);
     try {
+      const file = await safeFetch(new URL(manifestHref, pages[0]?.url).href, options).catch(() => null);
       const parsed = file?.status === 200 ? (JSON.parse(file.text) as Record<string, unknown>) : null;
       const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
       if (parsed) manifest = { name: text(parsed.name) ?? text(parsed.short_name), description: text(parsed.description), themeColor: text(parsed.theme_color) };
     } catch {
-      notes.push('The web app manifest is not valid JSON.');
+      notes.push('The web app manifest could not be read.');
     }
   }
   return { pages, manifest, notes };

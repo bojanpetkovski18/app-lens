@@ -1,6 +1,7 @@
 import { shouldReadPath, type ProjectFile } from '@app-lens/core';
 import { closeSync, lstatSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { matchesWildcard, type WildcardToken } from './wildcard';
 
 export interface FolderLimits {
   maxFiles: number;
@@ -15,6 +16,26 @@ export interface FolderScan {
   notes: string[];
 }
 
+function gitignoreTokens(pattern: string): WildcardToken[] {
+  const tokens: WildcardToken[] = [];
+  for (let index = 0; index < pattern.length; index++) {
+    if (pattern.startsWith('**/', index)) {
+      tokens.push({ type: 'folders' });
+      index += 2;
+    } else if (pattern.startsWith('**', index)) {
+      tokens.push({ type: 'star', crossSlash: true });
+      index += 1;
+    } else if (pattern[index] === '*') {
+      tokens.push({ type: 'star', crossSlash: false });
+    } else if (pattern[index] === '?') {
+      tokens.push({ type: 'one' });
+    } else {
+      tokens.push({ type: 'char', char: pattern[index] as string });
+    }
+  }
+  return tokens;
+}
+
 /** Turns a .gitignore pattern into a matcher for paths relative to the root. Negation is ignored. */
 export function gitignoreMatcher(text: string): (path: string) => boolean {
   const patterns = text
@@ -23,13 +44,13 @@ export function gitignoreMatcher(text: string): (path: string) => boolean {
     .filter((line) => line && !line.startsWith('#') && !line.startsWith('!'))
     .slice(0, 500)
     .map((line) => {
-      const anchored = line.replace(/\/$/, '').includes('/');
-      // \u0000 holds the place of ** while single * is expanded.
-      // eslint-disable-next-line no-control-regex
-      const body = line.replace(/^\//, '').replace(/\/$/, '').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\u0000/g, '.*');
-      return new RegExp(anchored ? `^${body}(/|$)` : `(^|/)${body}(/|$)`);
+      const pattern = line.replace(/\/$/, '');
+      return { anchored: pattern.includes('/'), tokens: gitignoreTokens(pattern.replace(/^\//, '')) };
     });
-  return (path) => patterns.some((pattern) => pattern.test(path));
+  return (path) => patterns.some(({ anchored, tokens }) => matchesWildcard(tokens, path, {
+    canStart: (index) => index === 0 || (!anchored && path[index - 1] === '/'),
+    canEnd: (index) => index === path.length || path[index] === '/',
+  }));
 }
 
 function readLimited(path: string, limit: number): string | null {

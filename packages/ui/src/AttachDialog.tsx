@@ -5,6 +5,7 @@ import { useDialog } from './useDialog';
 
 const MAX_FILES = 2000;
 const MAX_FILE_BYTES = 512 * 1024;
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 
 interface AttachDialogProps {
   onClose: () => void;
@@ -20,10 +21,12 @@ const TABS: { id: Tab; label: string }[] = [
 
 export async function readSelectedFiles(list: FileList | File[]): Promise<ProjectFile[]> {
   const files: ProjectFile[] = [];
+  let total = 0;
   for (const file of Array.from(list)) {
     // Selected paths start with the folder's own name.
     const path = (file.webkitRelativePath || file.name).split('/').slice(1).join('/') || file.name;
-    if (files.length >= MAX_FILES || file.size > MAX_FILE_BYTES || !shouldReadPath(path)) continue;
+    if (files.length >= MAX_FILES || file.size > MAX_FILE_BYTES || total + file.size > MAX_TOTAL_BYTES || !shouldReadPath(path)) continue;
+    total += file.size;
     files.push({ path, text: await file.text() });
   }
   return files;
@@ -62,10 +65,11 @@ export default function AttachDialog({ onClose, onDraft }: AttachDialogProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: value.trim() }),
       });
-      if (response.status === 404) {
+      // Static hosts answer 404 or 405, and error pages are not always JSON.
+      if (response.status === 404 || response.status === 405) {
         throw new Error(`This needs a server. Run: app-lens attach ${value.trim()}`);
       }
-      const body = (await response.json()) as { error?: string; manifest?: ManifestInput };
+      const body = (await response.json().catch(() => ({}))) as { error?: string; manifest?: ManifestInput };
       if (!response.ok || !body.manifest) throw new Error(body.error ?? `HTTP ${response.status}`);
       onDraft(value.trim(), body.manifest);
     } catch (reason) {

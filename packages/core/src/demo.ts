@@ -83,6 +83,10 @@ export function rankFeatures(manifest: Manifest, persona: string | null = null):
     .map(({ feature }) => feature);
 }
 
+function counted(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function listOf(items: string[]): string {
   if (items.length <= 1) return items.join('');
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
@@ -153,9 +157,8 @@ export function buildDemo(manifest: Manifest, dataset: Dataset, options: BuildDe
     });
   }
 
-  const scenarios = manifest.scenarios
-    .filter((scenario) => !persona || !scenario.persona || scenario.persona === persona)
-    .slice(0, maxScenarios);
+  const available = manifest.scenarios.filter((scenario) => !persona || !scenario.persona || scenario.persona === persona);
+  const scenarios = available.slice(0, maxScenarios);
   for (const scenario of scenarios) {
     scenes.push({
       kind: 'scenario',
@@ -174,13 +177,13 @@ export function buildDemo(manifest: Manifest, dataset: Dataset, options: BuildDe
     kind: 'outro',
     id: 'outro',
     title: `That's ${app.name}`,
-    caption: `${ranked.length} features, ${entities.length} types of data and ${manifest.scenarios.length} guided workflows. Explore the rest at your own pace.`,
+    caption: `${counted(ranked.length, 'feature')}, ${counted(entities.length, 'type')} of data and ${counted(available.length, 'guided workflow')}. Explore the rest at your own pace.`,
     durationMs: DEMO_TIMING.outro,
     stats: [
       { label: 'Features', value: ranked.length },
       { label: 'Personas', value: manifest.personas.length },
       { label: 'Data types', value: entities.length },
-      { label: 'Workflows', value: manifest.scenarios.length },
+      { label: 'Workflows', value: available.length },
     ],
     integrations: manifest.integrations.map((integration) => integration.name),
   });

@@ -25,7 +25,7 @@ const MIME_TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
 };
 
-// Inline styles are needed for runtime theming. Scripts only ever come from the site itself.
+// Scripts and styles only ever come from the site itself. Runtime theming sets style properties from script, which this allows.
 const CONTENT_SECURITY_POLICY = "default-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'";
 
 interface Options {

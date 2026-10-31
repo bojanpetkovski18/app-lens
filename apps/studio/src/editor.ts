@@ -1,4 +1,4 @@
-import { lintManifest, parseManifest, type LintResult, type Manifest, type ManifestIssue } from '@app-lens/core';
+import { lintManifest, parseManifest, type LintResult, type Manifest, type ManifestInput, type ManifestIssue } from '@app-lens/core';
 
 const MAX_HISTORY = 100;
 
@@ -104,4 +104,83 @@ function lastSignificant(text: string, before: number): number {
   let index = before - 1;
   while (index > 0 && /\s/.test(text[index] as string)) index--;
   return index;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const optionalStrings = (value: unknown): boolean => value === undefined || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
+const optionalRecords = (value: unknown): value is Record<string, unknown>[] | undefined => value === undefined || (Array.isArray(value) && value.every(isRecord));
+
+/** The form also shows invalid manifests, but only if each part has the shape it reads. */
+export function canUseForm(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const { app, personas, features, integrations, scenarios, entities } = value;
+  if (app !== undefined && !isRecord(app)) return false;
+  if (!optionalRecords(personas) || !optionalRecords(features) || !optionalRecords(integrations) || !optionalRecords(scenarios)) return false;
+  if (personas?.some((persona) => !optionalStrings(persona.goals))) return false;
+  if (features?.some((feature) => !optionalStrings(feature.highlights) || !optionalStrings(feature.personas) || !optionalStrings(feature.entities))) return false;
+  if (entities === undefined) return true;
+  return isRecord(entities) && Object.values(entities).every((entity) => isRecord(entity) && isRecord(entity.fields) && Object.values(entity.fields).every((spec) => typeof spec === 'string'));
+}
+
+/** One item per line. A trailing blank line stays so the next line can be typed. */
+export function splitLines(value: string): string[] {
+  if (!value) return [];
+  return value.split('\n').filter((line, index, all) => line || index === all.length - 1);
+}
+
+/** Keeps the key's position, because order decides how fields are generated and shown. */
+function renameKey<T>(record: Record<string, T>, from: string, to: string): Record<string, T> {
+  return Object.fromEntries(Object.entries(record).map(([key, value]) => [key === from ? to : key, value]));
+}
+
+/** Renames in place, along with everything that points at the entity. An existing name is refused, because it would replace that entity. */
+export function renameEntity(draft: ManifestInput, from: string, to: string): void {
+  const entities = draft.entities ?? {};
+  if (from === to || Object.hasOwn(entities, to)) return;
+  draft.entities = renameKey(entities, from, to);
+  for (const entity of Object.values(draft.entities)) {
+    for (const [field, spec] of Object.entries(entity.fields)) {
+      if (spec === `ref:${from}`) entity.fields[field] = `ref:${to}`;
+    }
+  }
+  for (const feature of draft.features ?? []) {
+    if (feature.entities) feature.entities = feature.entities.map((name) => (name === from ? to : name));
+  }
+  for (const scenario of draft.scenarios ?? []) {
+    if (scenario.entity === from) scenario.entity = to;
+  }
+}
+
+/** Renames in place, along with the display setting and walkthrough values. An existing name is refused. */
+export function renameField(draft: ManifestInput, entityName: string, from: string, to: string): void {
+  const entity = draft.entities?.[entityName];
+  if (!entity || from === to || Object.hasOwn(entity.fields, to)) return;
+  entity.fields = renameKey(entity.fields, from, to);
+  if (entity.display === from) entity.display = to;
+  for (const scenario of draft.scenarios ?? []) {
+    if (scenario.entity !== entityName) continue;
+    for (const step of scenario.steps) {
+      if (step.action === 'create' && step.values) step.values = renameKey(step.values, from, to);
+      if (step.action === 'select' && step.where) step.where = renameKey(step.where, from, to);
+      if (step.action === 'update') step.set = renameKey(step.set, from, to);
+    }
+  }
+}
+
+export function removePersona(draft: ManifestInput, index: number): void {
+  const [removed] = draft.personas?.splice(index, 1) ?? [];
+  if (!removed) return;
+  for (const feature of draft.features ?? []) {
+    if (feature.personas) feature.personas = feature.personas.filter((id) => id !== removed.id);
+  }
+  for (const scenario of draft.scenarios ?? []) {
+    if (scenario.persona === removed.id) delete scenario.persona;
+  }
+}
+
+export function removeEntity(draft: ManifestInput, name: string): void {
+  delete draft.entities?.[name];
+  for (const feature of draft.features ?? []) {
+    if (feature.entities) feature.entities = feature.entities.filter((item) => item !== name);
+  }
 }

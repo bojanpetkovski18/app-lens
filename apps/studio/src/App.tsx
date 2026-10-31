@@ -1,7 +1,7 @@
 import { diffManifests, parseManifest, starterManifest, type Manifest, type ManifestInput } from '@app-lens/core';
 import { AppLensView, IssuesView, useDialog } from '@app-lens/ui';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { analyze, createEditor, editorReducer, locatePath, serialize } from './editor';
+import { analyze, canUseForm, createEditor, editorReducer, locatePath, serialize } from './editor';
 import { FormEditor } from './FormEditor';
 
 const AttachDialog = lazy(() => import('@app-lens/ui/attach'));
@@ -28,7 +28,7 @@ function storeDraft(text: string): void {
 async function post(path: string, body: unknown, method = 'POST'): Promise<Record<string, unknown>> {
   const response = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (response.status === 404 || response.status === 405) throw new Error('This needs the local server. Run: app-lens studio');
-  const result = (await response.json()) as Record<string, unknown>;
+  const result = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok) throw new Error(String(result.error ?? `HTTP ${response.status}`));
   return result;
 }
@@ -46,7 +46,8 @@ function AiDialog({ onClose, children }: { onClose: () => void; children: ReactN
 
 interface Proposal {
   text: string;
-  changes: ReturnType<typeof diffManifests>;
+  /** Null when there is no valid manifest to compare with. */
+  changes: ReturnType<typeof diffManifests> | null;
 }
 
 export function App() {
@@ -54,6 +55,7 @@ export function App() {
   const [mode, setMode] = useState<'form' | 'json'>('form');
   const [dialog, setDialog] = useState<'attach' | 'ai' | null>(null);
   const [file, setFile] = useState<string | null>(null);
+  const [savedText, setSavedText] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [aiSource, setAiSource] = useState('');
   const [aiKind, setAiKind] = useState<'readme' | 'openapi'>('readme');
@@ -65,6 +67,18 @@ export function App() {
 
   const { text } = editor;
   const analysis = useMemo(() => analyze(text), [text]);
+  const formReady = canUseForm(analysis.value);
+  const dirty = file !== null && text !== savedText;
+
+  // A "Saved" message is only true until the next edit.
+  useEffect(() => setMessage(null), [text]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   // The preview keeps the last valid manifest, so it does not disappear in the middle of an edit.
   const [preview, setPreview] = useState<Manifest | null>(analysis.manifest);
@@ -83,6 +97,7 @@ export function App() {
       .then((result: { file: string | null; text: string | null } | null) => {
         if (!active || !result?.file) return;
         setFile(result.file);
+        setSavedText(result.text);
         if (result.text) dispatch({ type: 'load', text: result.text });
       })
       .catch(() => {
@@ -93,6 +108,7 @@ export function App() {
 
   const update = useCallback((change: (draft: ManifestInput) => void) => {
     const draft = structuredClone(analysis.value) as ManifestInput;
+    draft.app ??= { name: '' };
     change(draft);
     dispatch({ type: 'edit', text: serialize(draft) });
   }, [analysis.value]);
@@ -105,7 +121,7 @@ export function App() {
   const propose = (manifest: ManifestInput) => {
     const next = parseManifest(manifest);
     if (!next.ok) throw new Error('The draft did not validate.');
-    setProposal({ text: serialize(manifest), changes: preview ? diffManifests(preview, next.manifest) : [] });
+    setProposal({ text: serialize(manifest), changes: analysis.manifest ? diffManifests(analysis.manifest, next.manifest) : null });
     setDialog(null);
   };
 
@@ -133,6 +149,7 @@ export function App() {
   const save = async () => {
     try {
       const result = await post('/__app-lens/manifest', { text }, 'PUT');
+      setSavedText(text);
       setMessage(`Saved ${String(result.saved)}`);
     } catch (error) {
       setMessage((error as Error).message);
@@ -173,7 +190,7 @@ export function App() {
           <input ref={opener} type="file" accept=".json,application/json" hidden aria-label="Open manifest" onChange={(event) => void openFile(event.target.files?.[0])} />
           <button type="button" className="al-btn" onClick={() => setDialog('attach')}>Attach project</button>
           <button type="button" className="al-btn" onClick={() => setDialog('ai')}>Draft with AI</button>
-          {file ? <button type="button" className="al-btn al-btn-primary" disabled={!analysis.manifest} onClick={() => void save()}>Save</button> : null}
+          {file ? <button type="button" className="al-btn al-btn-primary" disabled={!analysis.manifest} onClick={() => void save()}>{dirty ? 'Save (unsaved changes)' : 'Save'}</button> : null}
           <button type="button" className={`al-btn${file ? '' : ' al-btn-primary'}`} onClick={download}>Download</button>
         </div>
       </header>
@@ -182,7 +199,7 @@ export function App() {
       {proposal ? (
         <section className="al-alert al-alert-info al-studio-review" aria-label="Review draft">
           <strong>Review this draft before you apply it.</strong>
-          {proposal.changes.length > 0 ? (
+          {proposal.changes === null ? <p>This replaces the current text.</p> : proposal.changes.length > 0 ? (
             <ul className="al-issues">
               {proposal.changes.slice(0, 40).map((change, index) => <li key={index}>{change.type} {change.section}: {change.name}</li>)}
             </ul>
@@ -198,8 +215,8 @@ export function App() {
         <section className="al-studio-editor" aria-label="Editor">
           <div className="al-toolbar">
             <div className="al-segmented" role="group" aria-label="Editor mode">
-              <button type="button" aria-pressed={mode === 'form'} disabled={!analysis.value} onClick={() => setMode('form')}>Form</button>
-              <button type="button" aria-pressed={mode === 'json'} onClick={() => setMode('json')}>JSON</button>
+              <button type="button" aria-pressed={mode === 'form' && formReady} disabled={!formReady} onClick={() => setMode('form')}>Form</button>
+              <button type="button" aria-pressed={mode === 'json' || !formReady} onClick={() => setMode('json')}>JSON</button>
             </div>
             <span className="al-muted" role="status">
               {problems.length > 0 ? `${problems.length} problem${problems.length === 1 ? '' : 's'}` : `Quality score ${score ?? 0}/100`}
@@ -220,7 +237,7 @@ export function App() {
             </div>
           ) : null}
 
-          {mode === 'form' && analysis.value ? (
+          {mode === 'form' && formReady ? (
             <FormEditor value={analysis.value as ManifestInput} onUpdate={update} />
           ) : (
             <textarea

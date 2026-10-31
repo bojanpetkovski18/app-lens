@@ -21,7 +21,7 @@ Usage
   app-lens studio [file] [--port 4318]               Edit a manifest with a live preview
   app-lens attach <folder|github-url|website>        Draft a manifest from an existing project
                    [--out file] [--report file] [--max-files N] [--max-pages N]
-                   [--dry-run] [--own] [--third-party] [--json]
+                   [--dry-run] [--force] [--own] [--third-party] [--json]
   app-lens schema [--out file]                       Print or write the manifest JSON schema
 
 Options
@@ -83,6 +83,7 @@ async function main(): Promise<void> {
         out: values.out,
         report: values.report,
         dryRun: values['dry-run'],
+        force: values.force,
         own: values.own,
         thirdParty: values['third-party'],
         maxFiles: limit(values['max-files'], '--max-files'),
@@ -110,8 +111,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  if (error instanceof CliError) {
-    console.error(`app-lens: ${error.message}`);
+  // A file system error is the person's to fix, so it gets a message. Anything else is a bug and keeps its stack.
+  if (error instanceof CliError || (error as NodeJS.ErrnoException).code) {
+    console.error(`app-lens: ${(error as Error).message}`);
   } else {
     console.error(error);
   }
